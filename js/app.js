@@ -56,6 +56,43 @@ annotator.onTextEdit = (annotation, index) => {
     textInputArea.focus();
 };
 
+// 选中标注时，侧边栏控件同步显示该标注的当前样式
+annotator.onSelectionChange = (ann) => {
+    if (!ann) {
+        // 取消选中时不重置控件，保持当前默认设置
+        return;
+    }
+
+    // 同步颜色
+    document.querySelectorAll('.color-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.color === ann.color);
+    });
+    document.getElementById('customColor').value = ann.color;
+
+    // 同步粗细（非文字标注）
+    if ('lineWidth' in ann) {
+        lineWidthSlider.value = ann.lineWidth;
+        lineWidthValue.textContent = ann.lineWidth + 'px';
+    }
+
+    // 同步字体相关（文字标注）
+    if (ann.type === 'text') {
+        document.getElementById('fontFamily').value = ann.fontFamily;
+        fontSizeSlider.value = ann.fontSize;
+        fontSizeValue.textContent = ann.fontSize + 'px';
+        document.getElementById('boldBtn').classList.toggle('active', !!ann.bold);
+        document.getElementById('italicBtn').classList.toggle('active', !!ann.italic);
+        document.getElementById('underlineBtn').classList.toggle('active', !!ann.underline);
+    }
+
+    // 同步不透明度
+    if ('opacity' in ann) {
+        const pct = Math.round((ann.opacity ?? 1.0) * 100);
+        opacitySlider.value = pct;
+        opacityValue.textContent = pct + '%';
+    }
+};
+
 // ===== 工具选择 =====
 document.querySelectorAll('.tool-select').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -90,12 +127,20 @@ document.querySelectorAll('.color-swatch').forEach(swatch => {
         swatch.classList.add('active');
         annotator.color = swatch.dataset.color;
         document.getElementById('customColor').value = swatch.dataset.color;
+        // 如果有选中标注，同步更新颜色
+        if (annotator.selectedAnnotation) {
+            annotator.updateSelectedStyle({ color: swatch.dataset.color });
+        }
     });
 });
 
 document.getElementById('customColor').addEventListener('input', (e) => {
     annotator.color = e.target.value;
     document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    // 如果有选中标注，同步更新颜色
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ color: e.target.value });
+    }
 });
 
 // ===== 线条粗细 =====
@@ -104,11 +149,18 @@ const lineWidthValue = document.getElementById('lineWidthValue');
 lineWidthSlider.addEventListener('input', (e) => {
     annotator.lineWidth = parseInt(e.target.value);
     lineWidthValue.textContent = e.target.value + 'px';
+    // 如果有选中标注，同步更新粗细
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ lineWidth: parseInt(e.target.value) });
+    }
 });
 
 // ===== 字体设置 =====
 document.getElementById('fontFamily').addEventListener('change', (e) => {
     annotator.fontFamily = e.target.value;
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ fontFamily: e.target.value });
+    }
 });
 
 const fontSizeSlider = document.getElementById('fontSize');
@@ -116,22 +168,34 @@ const fontSizeValue = document.getElementById('fontSizeValue');
 fontSizeSlider.addEventListener('input', (e) => {
     annotator.fontSize = parseInt(e.target.value);
     fontSizeValue.textContent = e.target.value + 'px';
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ fontSize: parseInt(e.target.value) });
+    }
 });
 
 // 文字样式
 document.getElementById('boldBtn').addEventListener('click', function() {
     this.classList.toggle('active');
     annotator.bold = this.classList.contains('active');
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ bold: annotator.bold });
+    }
 });
 
 document.getElementById('italicBtn').addEventListener('click', function() {
     this.classList.toggle('active');
     annotator.italic = this.classList.contains('active');
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ italic: annotator.italic });
+    }
 });
 
 document.getElementById('underlineBtn').addEventListener('click', function() {
     this.classList.toggle('active');
     annotator.underline = this.classList.contains('active');
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ underline: annotator.underline });
+    }
 });
 
 // ===== 不透明度 =====
@@ -140,6 +204,9 @@ const opacityValue = document.getElementById('opacityValue');
 opacitySlider.addEventListener('input', (e) => {
     annotator.opacity = parseInt(e.target.value) / 100;
     opacityValue.textContent = e.target.value + '%';
+    if (annotator.selectedAnnotation) {
+        annotator.updateSelectedStyle({ opacity: parseInt(e.target.value) / 100 });
+    }
 });
 
 // ===== 文字输入弹窗 =====

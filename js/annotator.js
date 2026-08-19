@@ -128,6 +128,9 @@ class Annotator {
                 this.dragLastY = pos.y;
                 this.dragOriginalAnn = JSON.parse(JSON.stringify(hit.annotation));
                 this.canvas.style.cursor = 'move';
+                this._styleUndoSaved = false;
+                // 通知外部：选中了标注（同步控件样式）
+                if (this.onSelectionChange) this.onSelectionChange(hit.annotation);
             } else {
                 this.deselect();
             }
@@ -556,6 +559,18 @@ class Annotator {
             return true;
         }
 
+        if (entry.action === 'style') {
+            const anns2 = this.annotationsByPage[page] || [];
+            if (entry.index < anns2.length) {
+                const current = JSON.parse(JSON.stringify(anns2[entry.index]));
+                anns2[entry.index] = entry.original;
+                entry.original = current;
+            }
+            this.redoStack.push(entry);
+            this.redraw();
+            return true;
+        }
+
         if (entry.action === 'add') {
             // 撤销添加：移除最后添加的标注
             const idx = anns.lastIndexOf(entry.annotation);
@@ -581,6 +596,18 @@ class Annotator {
         const page = entry.page;
 
         if (entry.action === 'move') {
+            const anns = this.annotationsByPage[page] || [];
+            if (entry.index < anns.length) {
+                const current = JSON.parse(JSON.stringify(anns[entry.index]));
+                anns[entry.index] = entry.original;
+                entry.original = current;
+            }
+            this.undoStack.push(entry);
+            this.redraw();
+            return true;
+        }
+
+        if (entry.action === 'style') {
             const anns = this.annotationsByPage[page] || [];
             if (entry.index < anns.length) {
                 const current = JSON.parse(JSON.stringify(anns[entry.index]));
@@ -650,6 +677,8 @@ class Annotator {
     deselect() {
         this.selectedAnnotation = null;
         this.selectedIndex = -1;
+        this._styleUndoSaved = false;
+        if (this.onSelectionChange) this.onSelectionChange(null);
         this.redraw();
     }
 
@@ -802,6 +831,55 @@ class Annotator {
         this.redoStack = [];
         this.redraw();
         return true;
+    }
+
+    /**
+     * 更新选中标注的样式属性
+     * @param {Object} props - 要更新的属性 { color, lineWidth, fontSize, fontFamily, bold, italic, underline, opacity }
+     */
+    updateSelectedStyle(props) {
+        if (!this.selectedAnnotation || this.selectedIndex < 0) return false;
+        const anns = this.annotationsByPage[this.currentPage];
+        if (!anns || this.selectedIndex >= anns.length) return false;
+        const ann = anns[this.selectedIndex];
+
+        // 保存修改前的状态用于撤销
+        if (!this._styleUndoSaved) {
+            this._pushUndo({
+                action: 'style',
+                original: JSON.parse(JSON.stringify(ann)),
+                index: this.selectedIndex,
+                page: this.currentPage
+            });
+            this.redoStack = [];
+            this._styleUndoSaved = true;
+        }
+
+        // 根据标注类型应用对应属性
+        if ('color' in props) ann.color = props.color;
+        if ('opacity' in props) ann.opacity = props.opacity;
+
+        if (ann.type === 'pen' || ann.type === 'highlight' || ann.type === 'line' || ann.type === 'arrow' || ann.type === 'rect') {
+            if ('lineWidth' in props) ann.lineWidth = props.lineWidth;
+        }
+
+        if (ann.type === 'text') {
+            if ('fontSize' in props) ann.fontSize = props.fontSize;
+            if ('fontFamily' in props) ann.fontFamily = props.fontFamily;
+            if ('bold' in props) ann.bold = props.bold;
+            if ('italic' in props) ann.italic = props.italic;
+            if ('underline' in props) ann.underline = props.underline;
+        }
+
+        this.redraw();
+        return true;
+    }
+
+    /**
+     * 结束样式编辑会话（重置undo标记，让下次修改可以单独撤销）
+     */
+    endStyleUpdate() {
+        this._styleUndoSaved = false;
     }
 
     /**
