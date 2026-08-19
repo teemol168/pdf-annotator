@@ -1,0 +1,566 @@
+/**
+ * App - 主应用逻辑
+ * 整合PDF.js渲染、标注引擎、工具栏交互、导出功能
+ */
+
+// ===== 全局状态 =====
+let pdfDoc = null;        // PDF.js文档对象
+let currentPage = 1;      // 当前页码（1-based）
+let totalPages = 0;
+let scale = 1.5;          // 渲染缩放
+let renderTask = null;    // 当前渲染任务（可取消）
+let annotator = null;     // 标注引擎实例
+let pdfFile = null;       // 原始PDF文件
+
+// ===== DOM元素 =====
+const fileInput = document.getElementById('fileInput');
+const fileNameEl = document.getElementById('fileName');
+const pdfCanvas = document.getElementById('pdfCanvas');
+const annotationCanvas = document.getElementById('annotationCanvas');
+const pdfViewer = document.getElementById('pdfViewer');
+const emptyState = document.getElementById('emptyState');
+const viewerContainer = document.getElementById('viewerContainer');
+const pageInput = document.getElementById('pageInput');
+const totalPagesEl = document.getElementById('totalPages');
+const zoomLevelEl = document.getElementById('zoomLevel');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const toast = document.getElementById('toast');
+const textInputModal = document.getElementById('textInputModal');
+const textInputArea = document.getElementById('textInputArea');
+
+// 设置PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    console.log('[PDF.js] worker configured:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+} else {
+    console.error('[PDF.js] pdfjsLib not found! Script may have failed to load from CDN.');
+}
+
+// ===== 初始化标注引擎 =====
+annotator = new Annotator(annotationCanvas);
+annotator.onTextRequest = (x, y) => {
+    // 新建文字标注
+    textInputArea.value = '';
+    delete textInputArea.dataset.editIndex;
+    textInputArea.dataset.posX = x;
+    textInputArea.dataset.posY = y;
+    textInputModal.style.display = 'flex';
+    textInputArea.focus();
+};
+
+annotator.onTextEdit = (annotation, index) => {
+    // 编辑已有文字标注（双击触发）
+    textInputArea.value = annotation.text;
+    textInputArea.dataset.editIndex = index;
+    textInputModal.style.display = 'flex';
+    textInputArea.focus();
+};
+
+// ===== 工具选择 =====
+document.querySelectorAll('.tool-select').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tool-select').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        annotator.tool = btn.dataset.tool;
+        annotator.deselect();
+
+        // 鼠标样式
+        const cursors = {
+            select: 'default',
+            pen: 'crosshair',
+            line: 'crosshair',
+            arrow: 'crosshair',
+            rect: 'crosshair',
+            text: 'text',
+            highlight: 'crosshair',
+            eraser: 'cell'
+        };
+        annotationCanvas.style.cursor = cursors[annotator.tool] || 'default';
+    });
+});
+
+// 默认选中选择工具
+document.querySelector('[data-tool="select"]').classList.add('active');
+annotator.tool = 'select';
+
+// ===== 颜色选择 =====
+document.querySelectorAll('.color-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+        document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+        swatch.classList.add('active');
+        annotator.color = swatch.dataset.color;
+        document.getElementById('customColor').value = swatch.dataset.color;
+    });
+});
+
+document.getElementById('customColor').addEventListener('input', (e) => {
+    annotator.color = e.target.value;
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+});
+
+// ===== 线条粗细 =====
+const lineWidthSlider = document.getElementById('lineWidth');
+const lineWidthValue = document.getElementById('lineWidthValue');
+lineWidthSlider.addEventListener('input', (e) => {
+    annotator.lineWidth = parseInt(e.target.value);
+    lineWidthValue.textContent = e.target.value + 'px';
+});
+
+// ===== 字体设置 =====
+document.getElementById('fontFamily').addEventListener('change', (e) => {
+    annotator.fontFamily = e.target.value;
+});
+
+const fontSizeSlider = document.getElementById('fontSize');
+const fontSizeValue = document.getElementById('fontSizeValue');
+fontSizeSlider.addEventListener('input', (e) => {
+    annotator.fontSize = parseInt(e.target.value);
+    fontSizeValue.textContent = e.target.value + 'px';
+});
+
+// 文字样式
+document.getElementById('boldBtn').addEventListener('click', function() {
+    this.classList.toggle('active');
+    annotator.bold = this.classList.contains('active');
+});
+
+document.getElementById('italicBtn').addEventListener('click', function() {
+    this.classList.toggle('active');
+    annotator.italic = this.classList.contains('active');
+});
+
+document.getElementById('underlineBtn').addEventListener('click', function() {
+    this.classList.toggle('active');
+    annotator.underline = this.classList.contains('active');
+});
+
+// ===== 不透明度 =====
+const opacitySlider = document.getElementById('opacity');
+const opacityValue = document.getElementById('opacityValue');
+opacitySlider.addEventListener('input', (e) => {
+    annotator.opacity = parseInt(e.target.value) / 100;
+    opacityValue.textContent = e.target.value + '%';
+});
+
+// ===== 文字输入弹窗 =====
+document.getElementById('textCancel').addEventListener('click', () => {
+    textInputModal.style.display = 'none';
+    textInputArea.value = '';
+});
+
+document.getElementById('textConfirm').addEventListener('click', () => {
+    const text = textInputArea.value.trim();
+    if (text) {
+        const editIndex = textInputArea.dataset.editIndex;
+        if (editIndex !== undefined) {
+            // 编辑已有文字标注
+            const idx = parseInt(editIndex);
+            const anns = annotator.annotationsByPage[annotator.currentPage] || [];
+            if (anns[idx]) {
+                annotator._pushUndo({
+                    action: 'move',
+                    original: JSON.parse(JSON.stringify(anns[idx])),
+                    index: idx,
+                    page: annotator.currentPage
+                });
+                anns[idx].text = text;
+                annotator.redoStack = [];
+                annotator.redraw();
+            }
+        } else {
+            // 新建文字标注
+            const x = parseFloat(textInputArea.dataset.posX);
+            const y = parseFloat(textInputArea.dataset.posY);
+            annotator.drawText(x, y, text);
+        }
+    }
+    textInputModal.style.display = 'none';
+    textInputArea.value = '';
+    delete textInputArea.dataset.editIndex;
+});
+
+textInputArea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('textConfirm').click();
+    } else if (e.key === 'Escape') {
+        document.getElementById('textCancel').click();
+    }
+});
+
+// ===== 文件加载 =====
+fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    console.log('[File] Selected file:', file.name, file.type, file.size, 'bytes');
+
+    // 检查PDF.js是否已加载
+    if (typeof pdfjsLib === 'undefined') {
+        showToast('PDF.js未加载，请检查网络连接后刷新页面');
+        console.error('[PDF.js] pdfjsLib is undefined - CDN script may have failed');
+        return;
+    }
+
+    // 某些浏览器file.type可能为空，用扩展名兜底
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+        showToast('请选择PDF文件');
+        return;
+    }
+
+    pdfFile = file;
+    fileNameEl.textContent = file.name;
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        console.log('[PDF.js] Got arrayBuffer, size:', arrayBuffer.byteLength);
+
+        const loadingTask = pdfjsLib.getDocument({
+            data: arrayBuffer,
+            // 禁用worker时的fallback参数
+            disableAutoFetch: false,
+            disableStream: false
+        });
+
+        // 监听加载进度
+        loadingTask.onProgress = (progress) => {
+            console.log('[PDF.js] Loading progress:', progress.loaded, '/', progress.total);
+        };
+
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+        totalPagesEl.textContent = totalPages;
+        pageInput.max = totalPages;
+        currentPage = 1;
+        pageInput.value = 1;
+
+        emptyState.style.display = 'none';
+        pdfViewer.style.display = 'block';
+
+        // 清空标注（新文件）
+        annotator.annotationsByPage = {};
+        annotator.undoStack = [];
+        annotator.redoStack = [];
+
+        console.log('[PDF.js] Document loaded, total pages:', totalPages);
+        await renderPage(currentPage);
+        showToast('已加载：' + file.name + '（' + totalPages + '页）');
+    } catch (err) {
+        console.error('[PDF.js] 加载失败:', err);
+        let msg = 'PDF加载失败';
+        if (err.message && err.message.includes('worker')) {
+            msg = 'PDF worker加载失败，请检查网络';
+        } else if (err.name === 'PasswordException') {
+            msg = 'PDF已加密，无法打开';
+        } else if (err.name === 'InvalidPDFException') {
+            msg = '无效的PDF文件';
+        }
+        showToast(msg);
+        loadingOverlay.style.display = 'none';
+    }
+});
+
+// ===== 渲染页面 =====
+async function renderPage(pageNum) {
+    if (!pdfDoc) return;
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        if (renderTask) {
+            renderTask.cancel();
+        }
+
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: scale });
+
+        // 设置canvas尺寸 = viewport尺寸（简洁直接，避免DPR transform问题）
+        pdfCanvas.width = Math.floor(viewport.width);
+        pdfCanvas.height = Math.floor(viewport.height);
+        pdfCanvas.style.width = Math.floor(viewport.width) + 'px';
+        pdfCanvas.style.height = Math.floor(viewport.height) + 'px';
+
+        annotationCanvas.width = Math.floor(viewport.width);
+        annotationCanvas.height = Math.floor(viewport.height);
+        annotationCanvas.style.width = Math.floor(viewport.width) + 'px';
+        annotationCanvas.style.height = Math.floor(viewport.height) + 'px';
+
+        console.log('[Render] canvas size:', pdfCanvas.width, 'x', pdfCanvas.height);
+
+        const renderContext = {
+            canvasContext: pdfCanvas.getContext('2d'),
+            viewport: viewport
+        };
+
+        renderTask = page.render(renderContext);
+        await renderTask.promise;
+        renderTask = null;
+        console.log('[Render] Page rendered successfully');
+
+        // 设置标注引擎
+        annotator.canvas = annotationCanvas;
+        annotator.ctx = annotationCanvas.getContext('2d');
+        annotator.setCurrentPage(pageNum - 1); // 0-based
+
+        pageInput.value = pageNum;
+        updateZoomDisplay();
+    } catch (err) {
+        if (err.name !== 'RenderingCancelledException') {
+            console.error('[Render] 渲染失败:', err);
+            showToast('页面渲染失败: ' + (err.message || err));
+        }
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+// ===== 翻页 =====
+document.getElementById('prevPage').addEventListener('click', () => {
+    if (currentPage > 1) {
+        currentPage--;
+        renderPage(currentPage);
+    }
+});
+
+document.getElementById('nextPage').addEventListener('click', () => {
+    if (currentPage < totalPages) {
+        currentPage++;
+        renderPage(currentPage);
+    }
+});
+
+pageInput.addEventListener('change', (e) => {
+    const page = parseInt(e.target.value);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderPage(currentPage);
+    } else {
+        pageInput.value = currentPage;
+    }
+});
+
+// ===== 缩放 =====
+document.getElementById('zoomIn').addEventListener('click', () => {
+    scale = Math.min(scale * 1.2, 5);
+    renderPage(currentPage);
+});
+
+document.getElementById('zoomOut').addEventListener('click', () => {
+    scale = Math.max(scale / 1.2, 0.3);
+    renderPage(currentPage);
+});
+
+document.getElementById('fitWidth').addEventListener('click', async () => {
+    if (!pdfDoc) return;
+    const page = await pdfDoc.getPage(currentPage);
+    const baseViewport = page.getViewport({ scale: 1 });
+    const containerWidth = viewerContainer.clientWidth - 48;
+    scale = containerWidth / baseViewport.width;
+    renderPage(currentPage);
+});
+
+function updateZoomDisplay() {
+    zoomLevelEl.textContent = Math.round(scale * 100 / 1.5) + '%';
+}
+
+// ===== 撤销/重做/清除 =====
+document.getElementById('undoBtn').addEventListener('click', () => {
+    if (annotator.undo()) {
+        showToast('已撤销');
+    }
+});
+
+document.getElementById('redoBtn').addEventListener('click', () => {
+    if (annotator.redo()) {
+        showToast('已重做');
+    }
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+    if (annotator.clearPage()) {
+        showToast('已清除当前页标注');
+    } else {
+        showToast('当前页无标注');
+    }
+});
+
+// 键盘快捷键
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        document.getElementById('undoBtn').click();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) {
+        e.preventDefault();
+        document.getElementById('redoBtn').click();
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (annotator.tool === 'select' && annotator.selectedAnnotation) {
+            e.preventDefault();
+            if (annotator.deleteSelected()) {
+                showToast('已删除标注');
+            }
+        }
+    }
+});
+
+// ===== 导出标注后的PDF =====
+document.getElementById('exportBtn').addEventListener('click', exportAnnotatedPDF);
+
+async function exportAnnotatedPDF() {
+    if (!pdfDoc) {
+        showToast('请先加载PDF');
+        return;
+    }
+
+    loadingOverlay.style.display = 'flex';
+    showToast('正在导出，请稍候...');
+
+    try {
+        const { PDFDocument } = await loadPdfLib();
+
+        const pdfBytes = await pdfFile.arrayBuffer();
+        const pdfDocLib = await PDFDocument.load(pdfBytes);
+        const pages = pdfDocLib.getPages();
+
+        // 保存标注引擎原始状态
+        const origCanvas = annotator.canvas;
+        const origCtx = annotator.ctx;
+        const origPage = annotator.currentPage;
+
+        for (let i = 0; i < pages.length; i++) {
+            const anns = annotator.getPageAnnotations(i);
+            if (anns.length === 0) continue;
+
+            const page = pages[i];
+            const { width: pageWidth, height: pageHeight } = page.getSize();
+
+            // 获取该页的渲染viewport（与屏幕显示一致）
+            const pdfPage = await pdfDoc.getPage(i + 1);
+            const viewport = pdfPage.getViewport({ scale: scale });
+
+            // 创建临时canvas，尺寸与屏幕渲染的canvas一致
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = Math.floor(viewport.width);
+            tempCanvas.height = Math.floor(viewport.height);
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // 切换标注引擎到临时canvas，绘制该页所有标注
+            annotator.canvas = tempCanvas;
+            annotator.ctx = tempCtx;
+            annotator.currentPage = i;
+            annotator.redraw();  // 在临时canvas上重绘该页所有标注
+
+            // 转为PNG（保留透明度）
+            const pngDataUrl = tempCanvas.toDataURL('image/png');
+            const pngBase64 = pngDataUrl.split(',')[1];
+            const pngBytes = Uint8Array.from(atob(pngBase64), c => c.charCodeAt(0));
+            const pngImage = await pdfDocLib.embedPng(pngBytes);
+
+            // 将标注图层叠加到PDF页面上
+            // Canvas: 左上角原点，Y向下
+            // PDF: 左下角原点，Y向上
+            // 图片覆盖整个页面
+            page.drawImage(pngImage, {
+                x: 0,
+                y: 0,
+                width: pageWidth,
+                height: pageHeight
+            });
+        }
+
+        // 恢复标注引擎原始状态
+        annotator.canvas = origCanvas;
+        annotator.ctx = origCtx;
+        annotator.currentPage = origPage;
+        annotator.redraw();
+
+        const pdfBytesOut = await pdfDocLib.save();
+        const blob = new Blob([pdfBytesOut], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'annotated_' + (pdfFile.name || 'document.pdf');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        showToast('导出成功！');
+    } catch (err) {
+        console.error('导出失败:', err);
+        showToast('导出失败：' + err.message);
+        // 确保恢复标注引擎状态
+        if (annotator.canvas !== annotationCanvas) {
+            annotator.canvas = annotationCanvas;
+            annotator.ctx = annotationCanvas.getContext('2d');
+            annotator.redraw();
+        }
+    } finally {
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+// pdf-lib加载缓存
+let _pdfLib = null;
+async function loadPdfLib() {
+    if (_pdfLib) return _pdfLib;
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js');
+    _pdfLib = { PDFDocument: PDFLib.PDFDocument, rgb: PDFLib.rgb };
+    return _pdfLib;
+}
+
+function loadScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+// ===== 工具函数 =====
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : { r: 0, g: 0, b: 0 };
+}
+
+function showToast(msg) {
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    clearTimeout(toast._timer);
+    toast._timer = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 2000);
+}
+
+// ===== 拖拽加载 =====
+viewerContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    viewerContainer.style.background = 'rgba(52,152,219,0.1)';
+});
+
+viewerContainer.addEventListener('dragleave', () => {
+    viewerContainer.style.background = '';
+});
+
+viewerContainer.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    viewerContainer.style.background = '';
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') {
+        fileInput.files = e.dataTransfer.files;
+        fileInput.dispatchEvent(new Event('change'));
+    } else {
+        showToast('请拖入PDF文件');
+    }
+});
+
+console.log('PDF Annotator initialized.');

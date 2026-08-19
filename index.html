@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF 标注工具</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- PDF.js 主库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <header class="toolbar">
+        <div class="toolbar-left">
+            <label class="file-upload-btn">
+                <input type="file" id="fileInput" accept=".pdf" hidden>
+                <span>📁 打开 PDF</span>
+            </label>
+            <span id="fileName" class="file-name">未加载文件</span>
+        </div>
+
+        <div class="toolbar-center">
+            <button id="prevPage" class="tool-btn" title="上一页">◀</button>
+            <span class="page-info">
+                第 <input type="number" id="pageInput" value="1" min="1"> / <span id="totalPages">0</span> 页
+            </span>
+            <button id="nextPage" class="tool-btn" title="下一页">▶</button>
+            <span class="divider"></span>
+            <button id="zoomOut" class="tool-btn" title="缩小">−</button>
+            <span id="zoomLevel" class="zoom-level">100%</span>
+            <button id="zoomIn" class="tool-btn" title="放大">+</button>
+            <button id="fitWidth" class="tool-btn" title="适应宽度">⤢</button>
+        </div>
+
+        <div class="toolbar-right">
+            <button id="undoBtn" class="tool-btn" title="撤销">↶ 撤销</button>
+            <button id="redoBtn" class="tool-btn" title="重做">↷ 重做</button>
+            <button id="clearBtn" class="tool-btn danger" title="清除当前页标注">🗑 清除</button>
+            <button id="exportBtn" class="tool-btn primary" title="导出标注后的PDF">⬇ 导出 PDF</button>
+        </div>
+    </header>
+
+    <!-- 主体区域：侧边栏 + 查看区 -->
+    <div class="main-content">
+    <!-- 左侧工具面板 -->
+    <aside class="side-panel">
+        <div class="tool-section">
+            <h3>绘图工具</h3>
+            <div class="tool-buttons">
+                <button class="tool-select active" data-tool="select" title="选择/移动/编辑">
+                    🖱 <span>选择</span>
+                </button>
+                <button class="tool-select" data-tool="pen" title="自由画线">
+                    ✏️ <span>画笔</span>
+                </button>
+                <button class="tool-select" data-tool="line" title="直线">
+                    📏 <span>直线</span>
+                </button>
+                <button class="tool-select" data-tool="arrow" title="箭头">
+                    ➤ <span>箭头</span>
+                </button>
+                <button class="tool-select" data-tool="rect" title="矩形框">
+                    ⬜ <span>矩形</span>
+                </button>
+                <button class="tool-select" data-tool="text" title="文字标注">
+                    🔤 <span>文字</span>
+                </button>
+                <button class="tool-select" data-tool="highlight" title="高亮">
+                    🖌 <span>高亮</span>
+                </button>
+                <button class="tool-select" data-tool="eraser" title="橡皮擦">
+                    🧽 <span>橡皮</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h3>颜色</h3>
+            <div class="color-picker-row">
+                <div class="color-swatches" id="colorSwatches">
+                    <button class="color-swatch active" style="background:#e74c3c" data-color="#e74c3c"></button>
+                    <button class="color-swatch" style="background:#e67e22" data-color="#e67e22"></button>
+                    <button class="color-swatch" style="background:#f1c40f" data-color="#f1c40f"></button>
+                    <button class="color-swatch" style="background:#2ecc71" data-color="#2ecc71"></button>
+                    <button class="color-swatch" style="background:#3498db" data-color="#3498db"></button>
+                    <button class="color-swatch" style="background:#9b59b6" data-color="#9b59b6"></button>
+                    <button class="color-swatch" style="background:#34495e" data-color="#34495e"></button>
+                    <button class="color-swatch" style="background:#ffffff;border:1px solid #ccc" data-color="#ffffff"></button>
+                </div>
+                <input type="color" id="customColor" value="#e74c3c" title="自定义颜色">
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h3>线条粗细</h3>
+            <div class="slider-row">
+                <input type="range" id="lineWidth" min="1" max="20" value="2">
+                <span id="lineWidthValue" class="slider-value">2px</span>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h3>文字设置</h3>
+            <label>字体</label>
+            <select id="fontFamily">
+                <option value="Arial, sans-serif">Arial</option>
+                <option value="'Times New Roman', serif">Times New Roman</option>
+                <option value="'Courier New', monospace">Courier New</option>
+                <option value="Georgia, serif">Georgia</option>
+                <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+                <option value="'SimSun', serif">宋体</option>
+                <option value="'KaiTi', serif">楷体</option>
+                <option value="'SimHei', sans-serif">黑体</option>
+            </select>
+            <label>字号</label>
+            <div class="slider-row">
+                <input type="range" id="fontSize" min="8" max="72" value="16">
+                <span id="fontSizeValue" class="slider-value">16px</span>
+            </div>
+            <div class="text-style-buttons">
+                <button id="boldBtn" class="style-btn" title="粗体"><b>B</b></button>
+                <button id="italicBtn" class="style-btn" title="斜体"><i>I</i></button>
+                <button id="underlineBtn" class="style-btn" title="下划线"><u>U</u></button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h3>不透明度</h3>
+            <div class="slider-row">
+                <input type="range" id="opacity" min="10" max="100" value="100">
+                <span id="opacityValue" class="slider-value">100%</span>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <h3>操作提示</h3>
+            <div style="font-size:12px;line-height:1.8;color:var(--text-muted);">
+                🖱 <b>选择</b>：点击标注选中<br>
+                &nbsp;&nbsp;&nbsp;拖拽移动，双击文字编辑<br>
+                &nbsp;&nbsp;&nbsp;Delete 键删除选中<br>
+                ✏️ <b>画笔/直线/箭头</b>：拖拽绘制<br>
+                🔤 <b>文字</b>：点击位置输入<br>
+                🧽 <b>橡皮</b>：点击标注擦除
+            </div>
+        </div>
+    </aside>
+
+    <!-- PDF显示区域 -->
+    <main class="viewer-container" id="viewerContainer">
+        <div id="emptyState" class="empty-state">
+            <div class="empty-icon">📄</div>
+            <h2>PDF 标注工具</h2>
+            <p>点击「打开 PDF」上传文件<br>支持画线、文字标注、颜色和字体设置</p>
+            <div class="features">
+                <div class="feature-item">✏️ 自由画笔 & 直线</div>
+                <div class="feature-item">🔤 文字标注</div>
+                <div class="feature-item">🎨 颜色 & 字体</div>
+                <div class="feature-item">⬇ 导出标注PDF</div>
+            </div>
+        </div>
+        <div id="pdfViewer" class="pdf-viewer" style="display:none;">
+            <canvas id="pdfCanvas"></canvas>
+            <canvas id="annotationCanvas" class="annotation-layer"></canvas>
+        </div>
+    </main>
+    </div><!-- /main-content -->
+
+    <!-- 文字输入弹窗 -->
+    <div id="textInputModal" class="text-modal" style="display:none;">
+        <div class="text-modal-content">
+            <h3>输入标注文字</h3>
+            <textarea id="textInputArea" placeholder="在此输入文字..." rows="3"></textarea>
+            <div class="text-modal-actions">
+                <button id="textCancel" class="tool-btn">取消</button>
+                <button id="textConfirm" class="tool-btn primary">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>正在加载PDF...</p>
+    </div>
+
+    <!-- Toast消息 -->
+    <div id="toast" class="toast" style="display:none;"></div>
+
+    <script src="js/annotator.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
