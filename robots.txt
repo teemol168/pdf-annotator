@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow:
+
+Sitemap: https://pdf-annotator.app/sitemap.xml
