@@ -63,6 +63,16 @@ class Annotator {
         this.currentPage = pageIndex;
         this.selectedAnnotation = null;
         this.selectedIndex = -1;
+
+        // 翻页时清除旧 textLayer（避免文本位置错乱）
+        if (this.textSelectionMode) {
+            const pageContainer = this.canvas.parentElement;
+            const oldTextLayer = pageContainer.querySelector('.textLayer');
+            if (oldTextLayer) {
+                oldTextLayer.remove();
+            }
+        }
+
         this.redraw();
     }
 
@@ -152,8 +162,8 @@ class Annotator {
             return;
         }
 
-        // 保存当前canvas快照（用于直线/箭头/矩形实时预览）
-        if (['line', 'arrow', 'rect'].includes(this.tool)) {
+        // 保存当前canvas快照（用于直线/箭头/矩形/波浪线实时预览）
+        if (['line', 'arrow', 'rect', 'wavyline'].includes(this.tool)) {
             this.snapshotImageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
         }
 
@@ -164,6 +174,11 @@ class Annotator {
             this._applyStyle();
             this.ctx.beginPath();
             this.ctx.moveTo(pos.x, pos.y);
+        }
+
+        // 波浪线开始新路径（只记录起点）
+        if (this.tool === 'wavyline') {
+            this.currentPath = [{ x: pos.x, y: pos.y }];
         }
     }
 
@@ -196,6 +211,9 @@ class Annotator {
                 break;
             case 'highlight':
                 this._drawHighlightMove(pos.x, pos.y);
+                break;
+            case 'wavyline':
+                this._drawWavyLineMove(pos.x, pos.y);
                 break;
             case 'line':
                 this._drawShapePreview(pos.x, pos.y, 'line');
@@ -256,6 +274,18 @@ class Annotator {
                     color: this.color,
                     lineWidth: this.lineWidth * 5,
                     opacity: this.opacity * 0.35
+                };
+                break;
+            case 'wavyline':
+                this.ctx.restore();
+                annotation = {
+                    type: 'wavyline',
+                    points: [...this.currentPath],
+                    color: this.color,
+                    lineWidth: this.lineWidth,
+                    amplitude: 2, // 波浪振幅（减小）
+                    frequency: 0.4, // 波浪频率
+                    opacity: this.opacity
                 };
                 break;
             case 'line':
@@ -321,6 +351,117 @@ class Annotator {
         this.ctx.lineWidth = this.lineWidth * 5;
         this.ctx.globalAlpha = this.opacity * 0.35;
         this.ctx.lineTo(x, y);
+        this.ctx.stroke();
+    }
+
+    /**
+     * 波浪线绘制（实时预览）- 使用快照避免重叠
+     */
+    _drawWavyLineMove(x, y) {
+        // 恢复快照（清除之前的预览，避免叠加变厚）
+        if (this.snapshotImageData) {
+            this.ctx.putImageData(this.snapshotImageData, 0, 0);
+        }
+
+        // 更新终点
+        this.currentPath = [this.currentPath[0], { x, y }];
+
+        // 在快照上绘制波浪线预览
+        this._drawWavyLine(this.currentPath);
+    }
+
+    /**
+     * 绘制波浪线路径（实时预览，使用当前样式）
+     * 直线模式：只连接起点和终点
+     * @param {Array} points - 路径点数组 [起点, 终点]
+     */
+    _drawWavyLine(points) {
+        if (points.length < 2) return;
+
+        const amplitude = 2; // 波浪振幅（减小）
+        const frequency = 0.4; // 波浪频率（稍微加密）
+
+        this.ctx.save();
+        this._applyStyle();
+
+        const startX = points[0].x;
+        const startY = points[0].y;
+        const endX = points[points.length - 1].x;
+        const endY = points[points.length - 1].y;
+
+        // 计算直线的长度和角度
+        const length = Math.hypot(endX - startX, endY - startY);
+        if (length === 0) return;
+
+        const angle = Math.atan2(endY - startY, endX - startX);
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
+
+        // 沿直线方向绘制正弦波
+        const steps = Math.max(10, Math.ceil(length / 2));
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const dist = length * t;
+
+            // 基础位置（沿直线）
+            const baseX = startX + Math.cos(angle) * dist;
+            const baseY = startY + Math.sin(angle) * dist;
+
+            // 波浪偏移（垂直于直线方向）
+            const waveOffset = Math.sin(dist * frequency) * amplitude;
+            const perpX = -Math.sin(angle) * waveOffset;
+            const perpY = Math.cos(angle) * waveOffset;
+
+            this.ctx.lineTo(baseX + perpX, baseY + perpY);
+        }
+
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+
+    /**
+     * 从标注数据绘制波浪线（重绘时使用）
+     */
+    _drawWavyLineFromAnn(ann) {
+        if (!ann.points || ann.points.length < 2) return;
+
+        const amplitude = ann.amplitude || 2;
+        const frequency = ann.frequency || 0.4;
+
+        this.ctx.strokeStyle = ann.color;
+        this.ctx.lineWidth = ann.lineWidth;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        const startX = ann.points[0].x;
+        const startY = ann.points[0].y;
+        const endX = ann.points[ann.points.length - 1].x;
+        const endY = ann.points[ann.points.length - 1].y;
+
+        const length = Math.hypot(endX - startX, endY - startY);
+        if (length === 0) return;
+
+        const angle = Math.atan2(endY - startY, endX - startX);
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(startX, startY);
+
+        const steps = Math.max(10, Math.ceil(length / 2));
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const dist = length * t;
+
+            const baseX = startX + Math.cos(angle) * dist;
+            const baseY = startY + Math.sin(angle) * dist;
+
+            const waveOffset = Math.sin(dist * frequency) * amplitude;
+            const perpX = -Math.sin(angle) * waveOffset;
+            const perpY = Math.cos(angle) * waveOffset;
+
+            this.ctx.lineTo(baseX + perpX, baseY + perpY);
+        }
+
         this.ctx.stroke();
     }
 
@@ -427,6 +568,12 @@ class Annotator {
                 this.ctx.stroke();
                 break;
 
+            case 'wavyline':
+                if (ann.points && ann.points.length > 1) {
+                    this._drawWavyLineFromAnn(ann);
+                }
+                break;
+
             case 'line':
                 this.ctx.strokeStyle = ann.color;
                 this.ctx.lineWidth = ann.lineWidth;
@@ -470,6 +617,20 @@ class Annotator {
                     }
                 });
                 break;
+
+            case 'texthighlight':
+                // 文字选择高亮：绘制背景色矩形（统一透明度）
+                if (ann.rects && ann.rects.length > 0) {
+                    this.ctx.fillStyle = ann.color;
+                    this.ctx.globalAlpha = ann.opacity || 0.45;
+                    // 先保存当前状态
+                    const currentAlpha = this.ctx.globalAlpha;
+
+                    ann.rects.forEach(rect => {
+                        this.ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+                    });
+                }
+                break;
         }
 
         this.ctx.restore();
@@ -502,6 +663,14 @@ class Annotator {
             case 'pen':
             case 'highlight':
                 return ann.points.some(p => Math.hypot(p.x - x, p.y - y) < radius);
+            case 'wavyline':
+                // 波浪线是直线模式，使用线段距离检测
+                if (ann.points && ann.points.length >= 2) {
+                    const start = ann.points[0];
+                    const end = ann.points[ann.points.length - 1];
+                    return this._distToSegment(x, y, start.x, start.y, end.x, end.y) < radius;
+                }
+                return false;
             case 'line':
             case 'arrow':
                 return this._distToSegment(x, y, ann.x1, ann.y1, ann.x2, ann.y2) < radius;
@@ -512,6 +681,15 @@ class Annotator {
                        (ann.x <= x + radius && x <= ann.x + ann.w + radius);
             case 'text':
                 return Math.abs(x - ann.x) < 100 && Math.abs(y - ann.y) < 50;
+            case 'texthighlight':
+                // 检查是否在任意高亮矩形内
+                if (ann.rects) {
+                    return ann.rects.some(rect =>
+                        x >= rect.x && x <= rect.x + rect.width &&
+                        y >= rect.y && y <= rect.y + rect.height
+                    );
+                }
+                return false;
             default:
                 return false;
         }
@@ -717,6 +895,7 @@ class Annotator {
         switch (ann.type) {
             case 'pen':
             case 'highlight':
+            case 'wavyline':
                 ann.points.forEach(p => { p.x += dx; p.y += dy; });
                 break;
             case 'line':
@@ -728,6 +907,15 @@ class Annotator {
             case 'text':
                 ann.x += dx; ann.y += dy;
                 break;
+            case 'texthighlight':
+                // 移动所有高亮矩形
+                if (ann.rects) {
+                    ann.rects.forEach(rect => {
+                        rect.x += dx;
+                        rect.y += dy;
+                    });
+                }
+                break;
         }
     }
 
@@ -737,7 +925,8 @@ class Annotator {
     _getAnnotationBounds(ann) {
         switch (ann.type) {
             case 'pen':
-            case 'highlight': {
+            case 'highlight':
+            case 'wavyline': {
                 if (!ann.points || ann.points.length === 0) return null;
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                 ann.points.forEach(p => {
@@ -774,6 +963,19 @@ class Annotator {
                 const h = lines.length * ann.fontSize * 1.3;
                 return { x: ann.x - 4, y: ann.y - 4, w: maxW + 12, h: h + 8 };
             }
+            case 'texthighlight':
+                // 返回所有高亮矩形的联合边界
+                if (ann.rects && ann.rects.length > 0) {
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    ann.rects.forEach(rect => {
+                        minX = Math.min(minX, rect.x);
+                        minY = Math.min(minY, rect.y);
+                        maxX = Math.max(maxX, rect.x + rect.width);
+                        maxY = Math.max(maxY, rect.y + rect.height);
+                    });
+                    return { x: minX - 4, y: minY - 4, w: maxX - minX + 8, h: maxY - minY + 8 };
+                }
+                return null;
             default:
                 return null;
         }
@@ -888,6 +1090,282 @@ class Annotator {
     _onTextRequest(x, y) {
         if (this.onTextRequest) {
             this.onTextRequest(x, y);
+        }
+    }
+
+    // ===== 文字选择高亮功能 =====
+
+    /**
+     * 设置PDF页面引用（用于TextLayer渲染）
+     * @param {PDFPageProxy} pdfPage - PDF.js的页面对象
+     * @param {number} scale - 缩放比例
+     */
+    setPdfPage(pdfPage, scale) {
+        this.pdfPage = pdfPage;
+        this.scale = scale;
+    }
+
+    /**
+     * 启用/禁用文字选择模式
+     * @param {boolean} enabled - 是否启用
+     */
+    async setTextSelectionMode(enabled) {
+        this.textSelectionMode = enabled;
+    
+        const pageContainer = this.canvas.parentElement;
+        let textLayer = pageContainer.querySelector('.textLayer');
+    
+        if (enabled) {
+            if (!textLayer) {
+                textLayer = document.createElement('div');
+                textLayer.className = 'textLayer';
+    
+                // 关键修复：textLayer 必须与 canvas 完全重叠
+                // 使用 canvas 的实际显示尺寸（CSS尺寸）
+                const displayWidth = parseFloat(this.canvas.style.width) || this.canvas.width;
+                const displayHeight = parseFloat(this.canvas.style.height) || this.canvas.height;
+    
+                Object.assign(textLayer.style, {
+                    position: 'absolute',
+                    left: '0px',
+                    top: '0px',
+                    width: displayWidth + 'px',
+                    height: displayHeight + 'px',
+                    overflow: 'hidden',  // 改为 hidden 防止溢出
+                    lineHeight: '1.0',
+                    pointerEvents: 'auto',
+                    cursor: 'text',
+                    zIndex: '10',
+                    userSelect: 'text',
+                    webkitUserSelect: 'text',
+                    mozUserSelect: 'text',
+                    msUserSelect: 'text'
+                });
+    
+                // 插入到 canvas 之后（确保在 canvas 上方接收鼠标事件）
+                this.canvas.parentNode.insertBefore(textLayer, this.canvas.nextSibling);
+            } else {
+                // 重新同步尺寸（翻页后尺寸可能变化）
+                const displayWidth = parseFloat(this.canvas.style.width) || this.canvas.width;
+                const displayHeight = parseFloat(this.canvas.style.height) || this.canvas.height;
+                textLayer.style.width = displayWidth + 'px';
+                textLayer.style.height = displayHeight + 'px';
+                
+                textLayer.style.pointerEvents = 'auto';
+                textLayer.style.display = 'block';
+            }
+    
+            // 渲染 TextLayer
+            await this._renderTextLayer(textLayer);
+            this._bindDocumentSelectionEvent();
+        } else {
+            if (textLayer) {
+                textLayer.style.pointerEvents = 'none';
+                textLayer.style.display = 'none';
+            }
+            this._unbindDocumentSelectionEvent();
+        }
+    }
+
+    /**
+     * 渲染PDF TextLayer
+     * @param {HTMLElement} textLayer - 文本层容器
+     */
+    async _renderTextLayer(textLayer) {
+        if (!this.pdfPage || !window.pdfjsLib) {
+            console.warn('无法渲染TextLayer: pdfPage或pdfjsLib不存在');
+            return;
+        }
+    
+        try {
+            const viewport = this.pdfPage.getViewport({ scale: this.scale });
+            const textContent = await this.pdfPage.getTextContent();
+    
+            // 清空旧内容
+            textLayer.innerHTML = '';
+    
+            // 关键修复：textLayer 尺寸必须与 canvas 的 CSS 尺寸完全一致
+            // canvas.style.width/height 是显示尺寸（= viewport.width/height，因为 DPR=1）
+            const displayWidth = parseFloat(this.canvas.style.width) || this.canvas.width;
+            const displayHeight = parseFloat(this.canvas.style.height) || this.canvas.height;
+    
+            Object.assign(textLayer.style, {
+                width: displayWidth + 'px',
+                height: displayHeight + 'px'
+            });
+    
+            // 设置PDF.js需要的CSS变量
+            textLayer.style.setProperty('--scale-factor', this.scale);
+    
+            // 使用PDF.js渲染TextLayer
+            await pdfjsLib.renderTextLayer({
+                textContentSource: textContent,
+                container: textLayer,
+                viewport: viewport,
+                textDivs: [],
+                textContentItemsStr: []
+            }).promise;
+    
+            // 设置文本span的样式：透明但可选择
+            const spans = textLayer.querySelectorAll('span[role="presentation"]');
+            spans.forEach(span => {
+                // 关键：不改变 span 的 transform/position，只改颜色使其透明
+                // PDF.js 用 transform: translate(Xpx, Ypx) 定位每个span
+                // 这些坐标已经基于 viewport scale 计算，与 canvas 坐标一一对应
+                Object.assign(span.style, {
+                    color: 'transparent',
+                    backgroundColor: 'transparent',
+                    cursor: 'text',
+                    userSelect: 'text',
+                    webkitUserSelect: 'text',
+                    mozUserSelect: 'text',
+                    msUserSelect: 'text',
+                    // 确保span不会影响布局
+                    position: 'absolute',
+                    whiteSpace: 'pre',
+                    lineHeight: '1.0',
+                    margin: '0',
+                    padding: '0',
+                    border: 'none',
+                    outline: 'none'
+                });
+            });
+
+            console.log('[TextLayer] 渲染完成, spans数量:', spans.length,
+                        'textLayer尺寸:', displayWidth, 'x', displayHeight);
+        } catch (error) {
+            console.error('TextLayer渲染失败:', error);
+        }
+    }
+
+    /**
+     * 绑定document级别的文本选择事件
+     */
+    _bindDocumentSelectionEvent() {
+        if (this._boundSelectionHandler) return;
+
+        this._boundSelectionHandler = () => {
+            if (!this.textSelectionMode || this.tool !== 'texthighlight') return;
+
+            setTimeout(() => {
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                    const range = selection.getRangeAt(0);
+
+                    // 关键修复：使用 range.getBoundingClientRect() 获取选区整体边界
+                    // 然后用 textLayer 作为参考元素做坐标转换（而非 canvas）
+                    // 因为选区是在 textLayer 的 DOM 元素上产生的，必须用同一坐标系转换
+                    const textLayer = this.canvas.parentElement.querySelector('.textLayer');
+                    if (!textLayer) return;
+
+                    const layerRect = textLayer.getBoundingClientRect();
+
+                    // 方法：遍历选区内的所有文本节点，获取它们在 textLayer 中的精确位置
+                    const highlightRects = [];
+                    const textSpans = textLayer.querySelectorAll('span[role="presentation"]');
+
+                    // 收集被选中的 span 及其在 textLayer 内的精确位置
+                    textSpans.forEach(span => {
+                        if (range.intersectsNode(span)) {
+                            const spanRect = span.getBoundingClientRect();
+                            // 相对于 textLayer 左上角的坐标（即 canvas 内部坐标）
+                            highlightRects.push({
+                                x: Math.round(spanRect.left - layerRect.left),
+                                y: Math.round(spanRect.top - layerRect.top),
+                                width: Math.round(spanRect.width),
+                                height: Math.round(spanRect.height)
+                            });
+                        }
+                    });
+
+                    if (highlightRects.length > 0) {
+                        // 合并相邻/重叠的矩形（同一行的多个span可能需要合并）
+                        const mergedRects = this._mergeHighlightRects(highlightRects);
+                        this._addTextHighlightAnnotation(mergedRects, selection.toString().trim());
+                    }
+
+                    selection.removeAllRanges();
+                }
+            }, 30);
+        };
+
+        document.addEventListener('mouseup', this._boundSelectionHandler);
+    }
+
+    /**
+     * 合并相邻的高亮矩形（垂直位置相近的合并为一个）
+     */
+    _mergeHighlightRects(rects) {
+        if (rects.length <= 1) return rects;
+
+        // 按Y坐标排序
+        rects.sort((a, b) => a.y - b.y || a.x - b.x);
+
+        const merged = [rects[0]];
+        for (let i = 1; i < rects.length; i++) {
+            const prev = merged[merged.length - 1];
+            const curr = rects[i];
+            // 如果Y坐标接近（同一行），且X方向连续或重叠，则合并
+            if (Math.abs(curr.y - prev.y) < curr.height * 0.5 &&
+                curr.x <= prev.x + prev.w + 2) {
+                // 扩展前一个矩形的宽度
+                const newX = Math.min(prev.x, curr.x);
+                const newW = Math.max(prev.x + prev.w, curr.x + curr.width) - newX;
+                prev.x = newX;
+                prev.w = newW;
+                // 取较大的高度
+                prev.h = Math.max(prev.h, curr.height);
+            } else {
+                merged.push({ ...curr, w: curr.width });
+            }
+        }
+        return merged;
+    }
+
+    /**
+     * 解绑document级别的文本选择事件
+     */
+    _unbindDocumentSelectionEvent() {
+        if (this._boundSelectionHandler) {
+            document.removeEventListener('mouseup', this._boundSelectionHandler);
+            this._boundSelectionHandler = null;
+            console.log('已解绑document mouseup事件');
+        }
+    }
+
+    /**
+     * 添加文字高亮标注
+     * @param {Array} rects - 高亮矩形数组
+     * @param {string} text - 选中的文本内容
+     */
+    _addTextHighlightAnnotation(rects, text) {
+        console.log('添加文字高亮:', text, '矩形数:', rects.length);
+
+        const annotation = {
+            type: 'texthighlight',
+            rects: rects,
+            color: this.color,
+            opacity: 0.45,  // 半透明，既能看到高亮又能看清文字
+            text: text,
+            pageNumber: this.currentPage
+        };
+
+        // 使用annotationsByPage存储
+        if (!this.annotationsByPage[this.currentPage]) {
+            this.annotationsByPage[this.currentPage] = [];
+        }
+        this.annotationsByPage[this.currentPage].push(annotation);
+
+        this._pushUndo({
+            action: 'add',
+            annotation: annotation,
+            page: this.currentPage
+        });
+        this.redoStack = [];
+
+        this.redraw();
+        if (this.onChange) {
+            this.onChange(this.getAllAnnotations());
         }
     }
 }

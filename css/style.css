@@ -433,6 +433,25 @@ body {
     cursor: default;
 }
 
+/* PDF.js TextLayer - 用于文字选择高亮 */
+.textLayer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.textLayer span[role="presentation"] {
+    position: absolute;
+    white-space: pre;
+    line-height: 1.0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+}
+
 /* ===== 文字输入弹窗 ===== */
 .text-modal {
     position: fixed;

@@ -110,9 +110,18 @@ document.querySelectorAll('.tool-select').forEach(btn => {
             rect: 'crosshair',
             text: 'text',
             highlight: 'crosshair',
+            wavyline: 'crosshair',
+            texthighlight: 'text',
             eraser: 'cell'
         };
         annotationCanvas.style.cursor = cursors[annotator.tool] || 'default';
+
+        // 文字选择高亮工具：启用/禁用TextLayer
+        if (annotator.tool === 'texthighlight') {
+            annotator.setTextSelectionMode(true);
+        } else {
+            annotator.setTextSelectionMode(false);
+        }
     });
 });
 
@@ -369,6 +378,9 @@ async function renderPage(pageNum) {
         annotator.canvas = annotationCanvas;
         annotator.ctx = annotationCanvas.getContext('2d');
         annotator.setCurrentPage(pageNum - 1); // 0-based
+
+        // 传递PDF页面对象给标注引擎（用于TextLayer渲染）
+        annotator.setPdfPage(page, scale);
 
         pageInput.value = pageNum;
         updateZoomDisplay();
