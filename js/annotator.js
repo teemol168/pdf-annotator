@@ -627,7 +627,7 @@ class Annotator {
                     const currentAlpha = this.ctx.globalAlpha;
 
                     ann.rects.forEach(rect => {
-                        this.ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+                        this.ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
                     });
                 }
                 break;
@@ -685,8 +685,8 @@ class Annotator {
                 // 检查是否在任意高亮矩形内
                 if (ann.rects) {
                     return ann.rects.some(rect =>
-                        x >= rect.x && x <= rect.x + rect.width &&
-                        y >= rect.y && y <= rect.y + rect.height
+                        x >= rect.x && x <= rect.x + rect.w &&
+                        y >= rect.y && y <= rect.y + rect.h
                     );
                 }
                 return false;
@@ -970,8 +970,8 @@ class Annotator {
                     ann.rects.forEach(rect => {
                         minX = Math.min(minX, rect.x);
                         minY = Math.min(minY, rect.y);
-                        maxX = Math.max(maxX, rect.x + rect.width);
-                        maxY = Math.max(maxY, rect.y + rect.height);
+                        maxX = Math.max(maxX, rect.x + rect.w);
+                        maxY = Math.max(maxY, rect.y + rect.h);
                     });
                     return { x: minX - 4, y: minY - 4, w: maxX - minX + 8, h: maxY - minY + 8 };
                 }
@@ -1252,36 +1252,31 @@ class Annotator {
                 if (selection.rangeCount > 0 && !selection.isCollapsed) {
                     const range = selection.getRangeAt(0);
 
-                    // 关键修复：使用 range.getBoundingClientRect() 获取选区整体边界
-                    // 然后用 textLayer 作为参考元素做坐标转换（而非 canvas）
-                    // 因为选区是在 textLayer 的 DOM 元素上产生的，必须用同一坐标系转换
                     const textLayer = this.canvas.parentElement.querySelector('.textLayer');
                     if (!textLayer) return;
 
                     const layerRect = textLayer.getBoundingClientRect();
 
-                    // 方法：遍历选区内的所有文本节点，获取它们在 textLayer 中的精确位置
+                    // 直接用 range.getClientRects() 获取选区矩形
+                    // 浏览器已按行计算，每行返回一个连续矩形（天然包含空格）
+                    const rangeRects = range.getClientRects();
                     const highlightRects = [];
-                    const textSpans = textLayer.querySelectorAll('span[role="presentation"]');
 
-                    // 收集被选中的 span 及其在 textLayer 内的精确位置
-                    textSpans.forEach(span => {
-                        if (range.intersectsNode(span)) {
-                            const spanRect = span.getBoundingClientRect();
-                            // 相对于 textLayer 左上角的坐标（即 canvas 内部坐标）
-                            highlightRects.push({
-                                x: Math.round(spanRect.left - layerRect.left),
-                                y: Math.round(spanRect.top - layerRect.top),
-                                width: Math.round(spanRect.width),
-                                height: Math.round(spanRect.height)
-                            });
-                        }
-                    });
+                    for (let i = 0; i < rangeRects.length; i++) {
+                        const r = rangeRects[i];
+                        // 过滤掉零尺寸的矩形
+                        if (r.width < 1 || r.height < 1) continue;
+
+                        highlightRects.push({
+                            x: Math.round(r.left - layerRect.left),
+                            y: Math.round(r.top - layerRect.top),
+                            w: Math.round(r.width),
+                            h: Math.round(r.height)
+                        });
+                    }
 
                     if (highlightRects.length > 0) {
-                        // 合并相邻/重叠的矩形（同一行的多个span可能需要合并）
-                        const mergedRects = this._mergeHighlightRects(highlightRects);
-                        this._addTextHighlightAnnotation(mergedRects, selection.toString().trim());
+                        this._addTextHighlightAnnotation(highlightRects, selection.toString().trim());
                     }
 
                     selection.removeAllRanges();
@@ -1290,36 +1285,6 @@ class Annotator {
         };
 
         document.addEventListener('mouseup', this._boundSelectionHandler);
-    }
-
-    /**
-     * 合并相邻的高亮矩形（垂直位置相近的合并为一个）
-     */
-    _mergeHighlightRects(rects) {
-        if (rects.length <= 1) return rects;
-
-        // 按Y坐标排序
-        rects.sort((a, b) => a.y - b.y || a.x - b.x);
-
-        const merged = [rects[0]];
-        for (let i = 1; i < rects.length; i++) {
-            const prev = merged[merged.length - 1];
-            const curr = rects[i];
-            // 如果Y坐标接近（同一行），且X方向连续或重叠，则合并
-            if (Math.abs(curr.y - prev.y) < curr.height * 0.5 &&
-                curr.x <= prev.x + prev.w + 2) {
-                // 扩展前一个矩形的宽度
-                const newX = Math.min(prev.x, curr.x);
-                const newW = Math.max(prev.x + prev.w, curr.x + curr.width) - newX;
-                prev.x = newX;
-                prev.w = newW;
-                // 取较大的高度
-                prev.h = Math.max(prev.h, curr.height);
-            } else {
-                merged.push({ ...curr, w: curr.width });
-            }
-        }
-        return merged;
     }
 
     /**
