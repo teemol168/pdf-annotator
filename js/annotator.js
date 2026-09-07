@@ -18,6 +18,7 @@ class Annotator {
         this.bold = false;
         this.italic = false;
         this.underline = false;
+        this.rotation = 0; // 文字旋转角度（度）
 
         // 绘制状态
         this.isDrawing = false;
@@ -524,6 +525,7 @@ class Annotator {
             bold: this.bold,
             italic: this.italic,
             underline: this.underline,
+            rotation: this.rotation,
             opacity: this.opacity
         };
         this._addAnnotation(annotation);
@@ -598,7 +600,7 @@ class Annotator {
                 this.ctx.strokeRect(ann.x, ann.y, ann.w, ann.h);
                 break;
 
-            case 'text':
+            case 'text': {
                 let fontStr = '';
                 if (ann.italic) fontStr += 'italic ';
                 if (ann.bold) fontStr += 'bold ';
@@ -607,16 +609,27 @@ class Annotator {
                 this.ctx.fillStyle = ann.color;
                 this.ctx.textBaseline = 'top';
 
+                // 绕文字起点 (ann.x, ann.y) 旋转
+                const deg = ann.rotation || 0;
+                const rad = deg * Math.PI / 180;
+                this.ctx.save();
+                this.ctx.translate(ann.x, ann.y);
+                if (rad) this.ctx.rotate(rad);
+
                 const lines = ann.text.split('\n');
+                const lineH = ann.fontSize * 1.3;
                 lines.forEach((line, i) => {
-                    this.ctx.fillText(line, ann.x, ann.y + i * ann.fontSize * 1.3);
+                    const ly = i * lineH;
+                    this.ctx.fillText(line, 0, ly);
                     if (ann.underline) {
                         const metrics = this.ctx.measureText(line);
-                        this.ctx.fillRect(ann.x, ann.y + i * ann.fontSize * 1.3 + ann.fontSize,
+                        this.ctx.fillRect(0, ly + ann.fontSize,
                                          metrics.width, Math.max(1, ann.fontSize / 12));
                     }
                 });
+                this.ctx.restore();
                 break;
+            }
 
             case 'texthighlight':
                 // 文字选择高亮：绘制背景色矩形（统一透明度）
@@ -679,8 +692,31 @@ class Annotator {
                        (ann.y <= y + radius && y <= ann.y + ann.h + radius) ||
                        (Math.abs(y - ann.y) < radius || Math.abs(y - (ann.y + ann.h)) < radius) &&
                        (ann.x <= x + radius && x <= ann.x + ann.w + radius);
-            case 'text':
-                return Math.abs(x - ann.x) < 100 && Math.abs(y - ann.y) < 50;
+            case 'text': {
+                // 旋转后命中检测：把鼠标点逆变换回文字局部坐标系
+                let fontStr = '';
+                if (ann.italic) fontStr += 'italic ';
+                if (ann.bold) fontStr += 'bold ';
+                fontStr += ann.fontSize + 'px ' + ann.fontFamily;
+                this.ctx.font = fontStr;
+                const lines = ann.text.split('\n');
+                let maxW = 0;
+                lines.forEach(line => {
+                    const m = this.ctx.measureText(line);
+                    if (m.width > maxW) maxW = m.width;
+                });
+                const h = lines.length * ann.fontSize * 1.3;
+
+                const deg = ann.rotation || 0;
+                const rad = -deg * Math.PI / 180;
+                const dx = x - ann.x;
+                const dy = y - ann.y;
+                const lx = dx * Math.cos(rad) - dy * Math.sin(rad);
+                const ly = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+                const pad = 6;
+                return lx >= -pad && lx <= maxW + pad && ly >= -pad && ly <= h + pad;
+            }
             case 'texthighlight':
                 // 检查是否在任意高亮矩形内
                 if (ann.rects) {
@@ -961,7 +997,26 @@ class Annotator {
                     if (m.width > maxW) maxW = m.width;
                 });
                 const h = lines.length * ann.fontSize * 1.3;
-                return { x: ann.x - 4, y: ann.y - 4, w: maxW + 12, h: h + 8 };
+
+                // 旋转后 4 个角点的世界坐标，取 AABB
+                const deg = ann.rotation || 0;
+                const rad = deg * Math.PI / 180;
+                const cos = Math.cos(rad);
+                const sin = Math.sin(rad);
+                const corners = [
+                    { x: 0, y: 0 }, { x: maxW, y: 0 },
+                    { x: maxW, y: h }, { x: 0, y: h }
+                ].map(p => ({
+                    x: ann.x + p.x * cos - p.y * sin,
+                    y: ann.y + p.x * sin + p.y * cos
+                }));
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                corners.forEach(c => {
+                    minX = Math.min(minX, c.x); minY = Math.min(minY, c.y);
+                    maxX = Math.max(maxX, c.x); maxY = Math.max(maxY, c.y);
+                });
+                const pad = 4;
+                return { x: minX - pad, y: minY - pad, w: maxX - minX + pad * 2, h: maxY - minY + pad * 2 };
             }
             case 'texthighlight':
                 // 返回所有高亮矩形的联合边界
@@ -1071,6 +1126,7 @@ class Annotator {
             if ('bold' in props) ann.bold = props.bold;
             if ('italic' in props) ann.italic = props.italic;
             if ('underline' in props) ann.underline = props.underline;
+            if ('rotation' in props) ann.rotation = props.rotation;
         }
 
         this.redraw();

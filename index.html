@@ -262,6 +262,25 @@
               <u>U</u>
             </button>
           </div>
+          <label>旋转角度</label>
+          <div class="slider-row">
+            <input
+              type="range"
+              id="rotation"
+              min="0"
+              max="360"
+              value="0"
+              step="1"
+            />
+            <span id="rotationValue" class="slider-value">0°</span>
+          </div>
+          <div class="rotation-presets">
+            <button data-rot="0" class="rot-preset">0°</button>
+            <button data-rot="45" class="rot-preset">45°</button>
+            <button data-rot="90" class="rot-preset">90°</button>
+            <button data-rot="180" class="rot-preset">180°</button>
+            <button data-rot="270" class="rot-preset">270°</button>
+          </div>
         </div>
 
         <div class="tool-section">

@@ -345,6 +345,36 @@ body {
     border-color: var(--accent);
 }
 
+/* ===== 旋转预设按钮 ===== */
+.rotation-presets {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+
+.rot-preset {
+    flex: 1;
+    min-width: 0;
+    background: var(--btn-bg);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.rot-preset:hover {
+    background: var(--btn-hover);
+}
+
+.rot-preset.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
 /* ===== PDF显示区 ===== */
 .viewer-container {
     flex: 1;

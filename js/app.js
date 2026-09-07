@@ -83,6 +83,13 @@ annotator.onSelectionChange = (ann) => {
         document.getElementById('boldBtn').classList.toggle('active', !!ann.bold);
         document.getElementById('italicBtn').classList.toggle('active', !!ann.italic);
         document.getElementById('underlineBtn').classList.toggle('active', !!ann.underline);
+        // 同步旋转（只更新控件显示，不触发修改）
+        const deg = ann.rotation || 0;
+        rotationSlider.value = deg;
+        rotationValue.textContent = Math.round(deg) + '°';
+        rotPresets.forEach(b => {
+            b.classList.toggle('active', parseInt(b.dataset.rot) === Math.round(deg));
+        });
     }
 
     // 同步不透明度
@@ -205,6 +212,36 @@ document.getElementById('underlineBtn').addEventListener('click', function() {
     if (annotator.selectedAnnotation) {
         annotator.updateSelectedStyle({ underline: annotator.underline });
     }
+});
+
+// ===== 文字旋转 =====
+const rotationSlider = document.getElementById('rotation');
+const rotationValue = document.getElementById('rotationValue');
+const rotPresets = document.querySelectorAll('.rot-preset');
+
+function setRotation(deg, fromPreset = false) {
+    deg = ((deg % 360) + 360) % 360; // 规范到 0-360
+    annotator.rotation = deg;
+    rotationSlider.value = deg;
+    rotationValue.textContent = Math.round(deg) + '°';
+    // 同步预设按钮高亮
+    rotPresets.forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.rot) === Math.round(deg));
+    });
+    // 修改选中标注
+    if (annotator.selectedAnnotation && annotator.selectedAnnotation.type === 'text') {
+        annotator.updateSelectedStyle({ rotation: deg });
+    }
+}
+
+rotationSlider.addEventListener('input', (e) => {
+    setRotation(parseInt(e.target.value));
+});
+
+rotPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+        setRotation(parseInt(btn.dataset.rot), true);
+    });
 });
 
 // ===== 不透明度 =====
