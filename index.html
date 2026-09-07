@@ -45,7 +45,7 @@
     />
 
     <!-- ===== Canonical ===== -->
-    <link rel="canonical" href="https://pdf.miyucaicai.cn//" />
+    <link rel="canonical" href="https://pdf.miyucaicai.cn/" />
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -87,6 +87,70 @@
     </script>
 
     <link rel="stylesheet" href="css/style.css" />
+    <style>
+      /* 品牌返回链接（工具栏左上角，链接到个人作品集首页） */
+      .brand-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 12px 5px 8px;
+        margin-right: 6px;
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.2s, transform 0.2s;
+      }
+      .brand-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #8b7cff, #5eead4);
+        box-shadow: 0 0 10px rgba(139, 124, 255, 0.7);
+        flex-shrink: 0;
+      }
+      .brand-sub {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--text-muted);
+        border-left: 1px solid var(--border-color);
+        padding-left: 8px;
+        margin-left: 2px;
+      }
+      @media (max-width: 760px) {
+        .brand-sub { display: none; }
+      }
+      @media (max-width: 520px) {
+        .brand-name { display: none; }
+      }
+
+      /* 功能详情区（可见的 SEO 友好说明，替代原隐藏文本块） */
+      .seo-details {
+        max-width: 660px;
+        margin: 28px auto 8px;
+        padding: 22px 24px 4px;
+        border-top: 1px solid var(--border-color);
+        text-align: left;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.85;
+      }
+      .seo-details h2 {
+        color: var(--text-light);
+        font-size: 15px;
+        margin: 14px 0 6px;
+        font-weight: 600;
+      }
+      .seo-details h2:first-child { margin-top: 0; }
+      .seo-details ul { padding-left: 20px; margin: 4px 0; }
+      .seo-details li { margin: 3px 0; }
+      .seo-details p { margin: 6px 0; }
+    </style>
     <!-- PDF.js 主库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   </head>
@@ -94,6 +158,11 @@
     <!-- 顶部工具栏 -->
     <header class="toolbar">
       <div class="toolbar-left">
+        <a class="brand-link" href="https://miyucaicai.cn/" title="返回 谜语猜猜 个人作品集" aria-label="返回 谜语猜猜 个人作品集首页">
+          <span class="brand-dot"></span>
+          <span class="brand-name">谜语猜猜</span>
+          <span class="brand-sub">作品集</span>
+        </a>
         <label class="file-upload-btn">
           <input type="file" id="fileInput" accept=".pdf" hidden />
           <span>📁 打开 PDF</span>
@@ -326,16 +395,8 @@
             <div class="feature-item">⬇ 导出标注PDF</div>
           </div>
 
-          <!-- SEO：搜索引擎可读的功能描述 -->
-          <div
-            style="
-              position: absolute;
-              left: -9999px;
-              top: -9999px;
-              overflow: hidden;
-            "
-            aria-hidden="true"
-          >
+          <!-- 功能详情：可见的 SEO 友好说明（替代原隐藏文本，避免被判作弊） -->
+          <div class="seo-details">
             <h2>PDF在线标注与编辑功能</h2>
             <p>
               本工具提供全面的PDF标注功能，包括：在PDF文件上自由画线、绘制直线和箭头、添加文字标注并设置字体大小和颜色、使用矩形框选区域、高亮标记重点内容。所有标注均可选中后移动、编辑文字内容、修改颜色字体大小等样式，支持撤销和重做操作，完成标注后可导出为新的PDF文件。完全免费，无需安装软件，在浏览器中即可使用。
@@ -346,16 +407,13 @@
               <li>直线标注：绘制精确直线</li>
               <li>箭头标注：绘制带箭头的指引线</li>
               <li>矩形标注：框选PDF区域</li>
-              <li>
-                文字标注：在PDF任意位置添加文字，可选字体、字号、颜色、粗体、斜体、下划线
-              </li>
+              <li>文字标注：在PDF任意位置添加文字，可选字体、字号、颜色、粗体、斜体、下划线</li>
               <li>高亮标注：半透明高亮笔标记</li>
               <li>橡皮擦：删除不需要的标注</li>
             </ul>
             <h2>PDF标注使用场景</h2>
             <p>
-              适用于合同审阅、论文批注、图纸标记、法律文书标注、教学课件批注、设计稿审阅等多种场景。支持中文和英文字体，包括微软雅黑、宋体、楷体、黑体、Arial、Times
-              New Roman等。标注后可一键导出PDF，方便分享和存档。
+              适用于合同审阅、论文批注、图纸标记、法律文书标注、教学课件批注、设计稿审阅等多种场景。支持中文和英文字体，包括微软雅黑、宋体、楷体、黑体、Arial、Times New Roman等。标注后可一键导出PDF，方便分享和存档。
             </p>
           </div>
 
