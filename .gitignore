@@ -17,3 +17,8 @@ desktop.ini
 
 # Temporary files
 *.tmp
+
+# Build artifacts
+*.zip
+*.tar.gz
+*.rar
