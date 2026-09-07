@@ -256,12 +256,19 @@ document.getElementById('textConfirm').addEventListener('click', () => {
 });
 
 textInputArea.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Ctrl/Cmd + Enter 提交确认（Enter 键默认换行，不拦截）
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         document.getElementById('textConfirm').click();
     } else if (e.key === 'Escape') {
         document.getElementById('textCancel').click();
     }
+});
+
+// textarea 自适应高度（输入多行时自动变高）
+textInputArea.addEventListener('input', () => {
+    textInputArea.style.height = 'auto';
+    textInputArea.style.height = Math.min(textInputArea.scrollHeight, 300) + 'px';
 });
 
 // ===== 文件加载 =====

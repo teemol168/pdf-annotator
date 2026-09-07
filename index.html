@@ -282,6 +282,7 @@
             &nbsp;&nbsp;&nbsp;Delete 键删除选中<br />
             ✏️ <b>画笔/直线/箭头</b>：拖拽绘制<br />
             🔤 <b>文字</b>：点击位置输入<br />
+            &nbsp;&nbsp;&nbsp;Enter 换行，Ctrl+Enter 确认<br />
             🧽 <b>橡皮</b>：点击标注擦除
           </div>
         </div>
@@ -360,9 +361,12 @@
         <h3>输入标注文字</h3>
         <textarea
           id="textInputArea"
-          placeholder="在此输入文字..."
-          rows="3"
+          placeholder="在此输入文字...&#10;（按 Enter 换行，Ctrl+Enter 确认）"
+          rows="5"
         ></textarea>
+        <div class="text-modal-hint">
+          按 <b>Enter</b> 换行，<b>Ctrl+Enter</b> 确认，<b>Esc</b> 取消
+        </div>
         <div class="text-modal-actions">
           <button id="textCancel" class="tool-btn">取消</button>
           <button id="textConfirm" class="tool-btn primary">确认</button>
