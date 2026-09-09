@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Document page -->
+  <rect x="30" y="16" width="68" height="92" rx="10" fill="#ffffff" stroke="#cfd6e4" stroke-width="3"/>
+  <!-- Top red bar (brand color) -->
+  <rect x="42" y="30" width="44" height="12" rx="6" fill="#e74c3c"/>
+  <!-- Text lines (gray) -->
+  <rect x="42" y="52" width="44" height="5" rx="2.5" fill="#d7dce8"/>
+  <rect x="42" y="64" width="34" height="5" rx="2.5" fill="#d7dce8"/>
+  <!-- Yellow highlight over a line -->
+  <rect x="42" y="76" width="44" height="9" rx="4.5" fill="#ffd54f" opacity="0.85"/>
+  <rect x="42" y="76" width="28" height="5" rx="2.5" fill="#aeb6c8"/>
+  <!-- Pen stroke (annotation) -->
+  <path d="M44 96 L74 96" stroke="#2c3e50" stroke-width="4" stroke-linecap="round"/>
+  <path d="M44 94 L52 96 L44 98 Z" fill="#2c3e50"/>
+</svg>
