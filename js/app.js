@@ -3,6 +3,9 @@
  * 整合PDF.js渲染、标注引擎、工具栏交互、导出功能
  */
 
+// i18n 兜底（防止 i18n.js 未加载时报错）
+const i18n = window.i18n || { t: k => k };
+
 // ===== 全局状态 =====
 let pdfDoc = null;        // PDF.js文档对象
 let currentPage = 1;      // 当前页码（1-based）
@@ -317,7 +320,7 @@ fileInput.addEventListener('change', async (e) => {
 
     // 检查PDF.js是否已加载
     if (typeof pdfjsLib === 'undefined') {
-        showToast('PDF.js未加载，请检查网络连接后刷新页面');
+        showToast(i18n.t('t_pdfjs_missing'));
         console.error('[PDF.js] pdfjsLib is undefined - CDN script may have failed');
         return;
     }
@@ -325,7 +328,7 @@ fileInput.addEventListener('change', async (e) => {
     // 某些浏览器file.type可能为空，用扩展名兜底
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     if (!isPdf) {
-        showToast('请选择PDF文件');
+        showToast(i18n.t('t_select_pdf'));
         return;
     }
 
@@ -366,16 +369,16 @@ fileInput.addEventListener('change', async (e) => {
 
         console.log('[PDF.js] Document loaded, total pages:', totalPages);
         await renderPage(currentPage);
-        showToast('已加载：' + file.name + '（' + totalPages + '页）');
+        showToast(i18n.t('t_loaded', { name: file.name, pages: totalPages }));
     } catch (err) {
         console.error('[PDF.js] 加载失败:', err);
-        let msg = 'PDF加载失败';
+        let msg = i18n.t('t_load_failed');
         if (err.message && err.message.includes('worker')) {
-            msg = 'PDF worker加载失败，请检查网络';
+            msg = i18n.t('t_worker_failed');
         } else if (err.name === 'PasswordException') {
-            msg = 'PDF已加密，无法打开';
+            msg = i18n.t('t_encrypted');
         } else if (err.name === 'InvalidPDFException') {
-            msg = '无效的PDF文件';
+            msg = i18n.t('t_invalid');
         }
         showToast(msg);
         loadingOverlay.style.display = 'none';
@@ -431,7 +434,7 @@ async function renderPage(pageNum) {
     } catch (err) {
         if (err.name !== 'RenderingCancelledException') {
             console.error('[Render] 渲染失败:', err);
-            showToast('页面渲染失败: ' + (err.message || err));
+            showToast(i18n.t('t_render_failed') + ': ' + (err.message || err));
         }
     } finally {
         loadingOverlay.style.display = 'none';
@@ -490,21 +493,21 @@ function updateZoomDisplay() {
 // ===== 撤销/重做/清除 =====
 document.getElementById('undoBtn').addEventListener('click', () => {
     if (annotator.undo()) {
-        showToast('已撤销');
+        showToast(i18n.t('t_undone'));
     }
 });
 
 document.getElementById('redoBtn').addEventListener('click', () => {
     if (annotator.redo()) {
-        showToast('已重做');
+        showToast(i18n.t('t_redone'));
     }
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
     if (annotator.clearPage()) {
-        showToast('已清除当前页标注');
+        showToast(i18n.t('t_cleared'));
     } else {
-        showToast('当前页无标注');
+        showToast(i18n.t('t_no_annotations'));
     }
 });
 
@@ -522,7 +525,7 @@ document.addEventListener('keydown', (e) => {
         if (annotator.tool === 'select' && annotator.selectedAnnotation) {
             e.preventDefault();
             if (annotator.deleteSelected()) {
-                showToast('已删除标注');
+                showToast(i18n.t('t_deleted'));
             }
         }
     }
@@ -533,12 +536,12 @@ document.getElementById('exportBtn').addEventListener('click', exportAnnotatedPD
 
 async function exportAnnotatedPDF() {
     if (!pdfDoc) {
-        showToast('请先加载PDF');
+        showToast(i18n.t('t_load_first'));
         return;
     }
 
     loadingOverlay.style.display = 'flex';
-    showToast('正在导出，请稍候...');
+    showToast(i18n.t('t_exporting'));
 
     try {
         const { PDFDocument } = await loadPdfLib();
@@ -610,10 +613,10 @@ async function exportAnnotatedPDF() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        showToast('导出成功！');
+        showToast(i18n.t('t_export_ok'));
     } catch (err) {
         console.error('导出失败:', err);
-        showToast('导出失败：' + err.message);
+        showToast(i18n.t('t_export_fail') + ': ' + err.message);
         // 确保恢复标注引擎状态
         if (annotator.canvas !== annotationCanvas) {
             annotator.canvas = annotationCanvas;
@@ -682,7 +685,7 @@ viewerContainer.addEventListener('drop', async (e) => {
         fileInput.files = e.dataTransfer.files;
         fileInput.dispatchEvent(new Event('change'));
     } else {
-        showToast('请拖入PDF文件');
+        showToast(i18n.t('t_drop_pdf'));
     }
 });
 
