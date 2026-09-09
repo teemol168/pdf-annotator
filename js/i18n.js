@@ -412,13 +412,19 @@
   }
 
   // 根据访问域名动态设置 canonical / hreflang / og:url
-  // 同一份代码同时部署在 pdf(国内) 与 pdfmark(海外)，
-  // 必须让 pdfmark 的 canonical 指向自己，否则 Google 会把它当作 pdf 的镜像而不收录
+  // 同一份代码同时部署在 国内 与 海外(pdfmark)，
+  // 必须让海外版的 canonical 指向自己，否则 Google 会把它当作国内站的镜像而不收录
   function applySeo() {
     const host = location.hostname || '';
+    const path = location.pathname || '';
     const isOversea = host.indexOf('pdfmark') === 0; // pdfmark.miyucaicai.cn
-    const cn = 'https://pdf.miyucaicai.cn/';
-    const en = 'https://pdfmark.miyucaicai.cn/';
+    const isHome = /home\.html$/.test(path) || /(^|\/)home\/?$/.test(path);
+
+    // 作品集首页：www(国内) ↔ pdfmark/home.html(海外)
+    // PDF 工具页：pdf(国内) ↔ pdfmark(海外)
+    const cn = isHome ? 'https://www.miyucaicai.cn/' : 'https://pdf.miyucaicai.cn/';
+    const en = isHome ? 'https://pdfmark.miyucaicai.cn/home.html'
+                      : 'https://pdfmark.miyucaicai.cn/';
     const self = isOversea ? en : cn;
 
     const c = document.getElementById('canonical');
@@ -428,9 +434,9 @@
     const og = document.getElementById('og_url');
 
     if (c) c.setAttribute('href', self);
-    if (hzh) hzh.setAttribute('href', cn); // 中文版 → pdf（国内）
-    if (hen) hen.setAttribute('href', en); // 英文版 → pdfmark（海外）
-    if (hx) hx.setAttribute('href', en);   // x-default → 海外英文版
+    if (hzh) hzh.setAttribute('href', cn);  // 中文版 → 国内站
+    if (hen) hen.setAttribute('href', en);   // 英文版 → 海外站
+    if (hx) hx.setAttribute('href', en);     // x-default → 海外英文版
     if (og) og.setAttribute('content', self);
   }
 
