@@ -411,8 +411,32 @@
     return s;
   }
 
+  // 根据访问域名动态设置 canonical / hreflang / og:url
+  // 同一份代码同时部署在 pdf(国内) 与 pdfmark(海外)，
+  // 必须让 pdfmark 的 canonical 指向自己，否则 Google 会把它当作 pdf 的镜像而不收录
+  function applySeo() {
+    const host = location.hostname || '';
+    const isOversea = host.indexOf('pdfmark') === 0; // pdfmark.miyucaicai.cn
+    const cn = 'https://pdf.miyucaicai.cn/';
+    const en = 'https://pdfmark.miyucaicai.cn/';
+    const self = isOversea ? en : cn;
+
+    const c = document.getElementById('canonical');
+    const hzh = document.getElementById('hl_zh');
+    const hen = document.getElementById('hl_en');
+    const hx = document.getElementById('hl_x');
+    const og = document.getElementById('og_url');
+
+    if (c) c.setAttribute('href', self);
+    if (hzh) hzh.setAttribute('href', cn); // 中文版 → pdf（国内）
+    if (hen) hen.setAttribute('href', en); // 英文版 → pdfmark（海外）
+    if (hx) hx.setAttribute('href', en);   // x-default → 海外英文版
+    if (og) og.setAttribute('content', self);
+  }
+
   function apply(root) {
     root = root || document;
+    applySeo();
     // textContent
     root.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
