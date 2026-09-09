@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow:
 
-Sitemap: https://pdf.miyucaicai.cn//sitemap.xml
+Sitemap: https://pdfmark.miyucaicai.cn/sitemap.xml
