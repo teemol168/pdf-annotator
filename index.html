@@ -231,6 +231,7 @@
             <button type="button" class="page-menu-item" data-page-action="delete" data-i18n="delete_page">删除页面</button>
             <button type="button" class="page-menu-item" data-page-action="extract" data-i18n="extract_page">提取页面</button>
             <button type="button" class="page-menu-item" data-page-action="merge" data-i18n="merge_pdf">合并 PDF</button>
+            <button type="button" class="page-menu-item" data-page-action="image" data-i18n="image_to_pdf">图片转 PDF</button>
             <div class="page-menu-sep"></div>
             <button type="button" class="page-menu-item" data-page-action="restore" data-i18n="restore_pages">恢复全部页面</button>
           </div>
@@ -554,6 +555,31 @@
         <div class="text-modal-actions">
           <button id="mergeCancel" class="tool-btn" data-i18n="cancel">取消</button>
           <button id="mergeConfirm" class="tool-btn primary" data-i18n="merge_btn">合并并载入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片转 PDF 弹窗 -->
+    <div id="imageModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content" style="width: 480px">
+        <h3 data-i18n="image_title">图片转 PDF</h3>
+        <div class="merge-dropzone" id="imageDropzone">
+          <span data-i18n="image_drop_hint">点击选择 或 拖拽图片到此处</span>
+        </div>
+        <input type="file" id="imageFileInput" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple style="display: none" />
+        <div class="image-list" id="imageList"></div>
+        <div class="page-total-hint" id="imageTotalHint"></div>
+        <div class="image-size-row">
+          <span class="page-modal-label" data-i18n="image_page_size" style="margin: 0">页面尺寸</span>
+          <div class="image-size-options" id="imageSizeOptions">
+            <button type="button" class="image-size-btn active" data-size="original" data-i18n="image_size_original">原图尺寸</button>
+            <button type="button" class="image-size-btn" data-size="a4" data-i18n="image_size_a4">适配 A4</button>
+          </div>
+        </div>
+        <div class="text-modal-hint" data-i18n-html="image_hint_html">每张图生成一页 · 支持 PNG / JPG</div>
+        <div class="text-modal-actions">
+          <button id="imageCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="imageConfirm" class="tool-btn primary" data-i18n="image_btn">生成 PDF</button>
         </div>
       </div>
     </div>

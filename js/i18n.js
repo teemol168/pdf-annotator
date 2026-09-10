@@ -173,6 +173,22 @@
       "merge_fail": "合并失败",
       "pages_unit": "页",
 
+      // ===== 图片转 PDF =====
+      "image_to_pdf": "图片转 PDF",
+      "image_title": "图片转 PDF",
+      "image_drop_hint": "点击选择 或 拖拽图片到此处",
+      "image_hint_html": "每张图生成一页 · 支持 PNG / JPG",
+      "image_btn": "生成 PDF",
+      "image_page_size": "页面尺寸",
+      "image_size_original": "原图尺寸",
+      "image_size_a4": "适配 A4",
+      "image_rotate_tip": "旋转 90°",
+      "image_total": "共 {n} 张图片",
+      "image_empty": "请添加至少一张图片",
+      "image_unsupported": "不支持的格式：{name}（仅 PNG/JPG）",
+      "image_ok": "已生成 {n} 页 PDF",
+      "image_fail": "生成失败",
+
       // ===== 语言切换器 =====
       "lang_zh": "中",
       "lang_en": "EN",
@@ -402,6 +418,22 @@
       "merge_ok": "Merged {n} files ({pages} pages)",
       "merge_fail": "Merge failed",
       "pages_unit": "pages",
+
+      // ===== images to PDF =====
+      "image_to_pdf": "Images to PDF",
+      "image_title": "Images to PDF",
+      "image_drop_hint": "Click or drag images here",
+      "image_hint_html": "One page per image · PNG / JPG",
+      "image_btn": "Generate PDF",
+      "image_page_size": "Page size",
+      "image_size_original": "Original size",
+      "image_size_a4": "Fit A4",
+      "image_rotate_tip": "Rotate 90°",
+      "image_total": "{n} images",
+      "image_empty": "Add at least one image",
+      "image_unsupported": "Unsupported: {name} (PNG/JPG only)",
+      "image_ok": "Generated {n}-page PDF",
+      "image_fail": "Generate failed",
 
       // ===== lang switch =====
       "lang_zh": "中",

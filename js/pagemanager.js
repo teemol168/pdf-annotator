@@ -150,6 +150,7 @@
       const action = item.dataset.pageAction;
       // 合并不需要预加载 PDF（它从多个文件创建新文档），直接开弹窗
       if (action === 'merge') { openMergeModal(); return; }
+      if (action === 'image') { openImageModal(); return; }
       if (!pdfDoc) { showToast(i18n.t('t_load_first')); return; }
       if (action === 'delete') openDeleteModal();
       else if (action === 'extract') openExtractModal();
@@ -418,10 +419,286 @@
     }
   });
 
-  // 让删除/提取/合并弹窗可由标题栏拖动
+  // ===== 图片转 PDF =====
+  const imageModal = document.getElementById('imageModal');
+  const imageDropzone = document.getElementById('imageDropzone');
+  const imageFileInput = document.getElementById('imageFileInput');
+  const imageList = document.getElementById('imageList');
+  const imageTotalHint = document.getElementById('imageTotalHint');
+  const imageSizeOptions = document.getElementById('imageSizeOptions');
+  let imageFiles = []; // [{ file, type:'png'|'jpg', width, height, url, rotation }]
+  let imagePageSize = 'original'; // 'original' | 'a4'
+  let imageDragSrc = null;
+
+  // 缩略图悬浮大图预览
+  let imagePreviewEl = null;
+  let imagePreviewImg = null;
+  function ensureImagePreview() {
+    if (imagePreviewEl) return;
+    imagePreviewEl = document.createElement('div');
+    imagePreviewEl.className = 'image-preview';
+    const im = document.createElement('img');
+    imagePreviewEl.appendChild(im);
+    imagePreviewImg = im;
+    document.body.appendChild(imagePreviewEl);
+  }
+  function showImagePreview(item, thumb) {
+    ensureImagePreview();
+    imagePreviewImg.src = item.url;
+    imagePreviewImg.style.transform = 'rotate(' + (item.rotation || 0) + 'deg)';
+    const rect = thumb.getBoundingClientRect();
+    const pw = 340, ph = 440;
+    let left = rect.right + 12;
+    if (left + pw > window.innerWidth) left = Math.max(8, rect.left - pw - 12);
+    let top = rect.top;
+    if (top + ph > window.innerHeight) top = Math.max(8, window.innerHeight - ph - 8);
+    imagePreviewEl.style.left = left + 'px';
+    imagePreviewEl.style.top = top + 'px';
+    imagePreviewEl.style.display = 'block';
+  }
+  function hideImagePreview() {
+    if (imagePreviewEl) imagePreviewEl.style.display = 'none';
+  }
+
+  function openImageModal() {
+    imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
+    imageFiles = [];
+    renderImageList();
+    centerModal(imageModal.querySelector('.text-modal-content'));
+    imageModal.style.display = 'flex';
+  }
+
+  function imageType(file) {
+    const t = (file.type || '').toLowerCase();
+    if (t === 'image/png') return 'png';
+    if (t === 'image/jpeg') return 'jpg';
+    const name = file.name.toLowerCase();
+    if (name.endsWith('.png')) return 'png';
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'jpg';
+    return null;
+  }
+
+  function loadImageEl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  // 按用户设定的旋转角，用 canvas 生成旋转后的图片字节（返回新尺寸/类型）
+  async function getRotatedImageEntry(im) {
+    const rot = (im.rotation || 0) % 360;
+    if (!rot) {
+      const bytes = await im.file.arrayBuffer();
+      return { bytes, width: im.width, height: im.height, type: im.type };
+    }
+    const w = im.width, h = im.height;
+    const canvas = document.createElement('canvas');
+    if (rot === 90 || rot === 270) { canvas.width = h; canvas.height = w; }
+    else { canvas.width = w; canvas.height = h; }
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(rot * Math.PI / 180);
+    const img = await loadImageEl(im.url);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    const bytes = await blob.arrayBuffer();
+    return { bytes, width: canvas.width, height: canvas.height, type: 'png' };
+  }
+
+  async function addImageFiles(fileList) {
+    for (const file of fileList) {
+      const type = imageType(file);
+      if (!type) {
+        showToast(i18n.t('image_unsupported', { name: file.name }));
+        continue;
+      }
+      try {
+        const url = URL.createObjectURL(file);
+        const img = await loadImageEl(url);
+        imageFiles.push({ file, type, width: img.naturalWidth, height: img.naturalHeight, url, rotation: 0 });
+      } catch (err) {
+        console.error('[PageManager] 图片读取失败:', file.name, err);
+        showToast(i18n.t('image_unsupported', { name: file.name }));
+      }
+    }
+    renderImageList();
+  }
+
+  function renderImageList() {
+    imageList.innerHTML = '';
+    imageFiles.forEach((im, i) => {
+      const item = document.createElement('div');
+      item.className = 'image-item';
+      item.dataset.index = i;
+      item.draggable = true;
+      item.innerHTML =
+        '<span class="drag-handle" title="拖拽调序">⋮⋮</span>' +
+        '<img class="image-thumb" alt="" />' +
+        '<span class="image-name"></span>' +
+        '<span class="image-dim"></span>' +
+        '<button type="button" class="image-rotate" title="">↻</button>' +
+        '<button type="button" class="merge-remove" title="移除">✕</button>';
+      const thumb = item.querySelector('.image-thumb');
+      thumb.src = im.url;
+      thumb.style.transform = 'rotate(' + (im.rotation || 0) + 'deg)';
+      thumb.addEventListener('mouseenter', () => showImagePreview(im, thumb));
+      thumb.addEventListener('mouseleave', hideImagePreview);
+      item.querySelector('.image-name').textContent = im.file.name;
+      const rot = (im.rotation || 0) % 360;
+      const dispW = (rot === 90 || rot === 270) ? im.height : im.width;
+      const dispH = (rot === 90 || rot === 270) ? im.width : im.height;
+      item.querySelector('.image-dim').textContent = dispW + '×' + dispH;
+      const rotateBtn = item.querySelector('.image-rotate');
+      rotateBtn.title = i18n.t('image_rotate_tip');
+      rotateBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        im.rotation = ((im.rotation || 0) + 90) % 360;
+        renderImageList();
+      });
+      item.querySelector('.merge-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const [removed] = imageFiles.splice(i, 1);
+        if (removed && removed.url) URL.revokeObjectURL(removed.url);
+        renderImageList();
+      });
+      imageList.appendChild(item);
+    });
+    imageTotalHint.textContent = imageFiles.length === 0
+      ? ''
+      : i18n.t('image_total', { n: imageFiles.length });
+  }
+
+  // 列表拖拽调序
+  imageList.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.image-item');
+    if (!item) return;
+    imageDragSrc = parseInt(item.dataset.index);
+    item.classList.add('dragging');
+  });
+  imageList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const item = e.target.closest('.image-item');
+    if (item) item.classList.add('drag-over');
+  });
+  imageList.addEventListener('dragleave', (e) => {
+    const item = e.target.closest('.image-item');
+    if (item) item.classList.remove('drag-over');
+  });
+  imageList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const item = e.target.closest('.image-item');
+    if (!item || imageDragSrc === null) return;
+    const targetIdx = parseInt(item.dataset.index);
+    if (imageDragSrc !== targetIdx) {
+      const [moved] = imageFiles.splice(imageDragSrc, 1);
+      imageFiles.splice(targetIdx, 0, moved);
+      renderImageList();
+    }
+  });
+  imageList.addEventListener('dragend', () => {
+    imageDragSrc = null;
+    imageList.querySelectorAll('.image-item').forEach(i => i.classList.remove('dragging', 'drag-over'));
+  });
+
+  // 选择 / 整窗放置
+  imageDropzone.addEventListener('click', () => imageFileInput.click());
+  imageFileInput.addEventListener('change', async (e) => {
+    await addImageFiles(e.target.files);
+    imageFileInput.value = '';
+  });
+  imageModal.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      imageDropzone.classList.add('drag-active');
+    }
+  });
+  imageModal.addEventListener('dragleave', (e) => {
+    if (!imageModal.contains(e.relatedTarget)) {
+      imageDropzone.classList.remove('drag-active');
+    }
+  });
+  imageModal.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    imageDropzone.classList.remove('drag-active');
+    const files = e.dataTransfer.files;
+    if (files && files.length) {
+      await addImageFiles(files);
+    }
+  });
+
+  // 页面尺寸切换
+  imageSizeOptions.addEventListener('click', (e) => {
+    const btn = e.target.closest('.image-size-btn');
+    if (!btn) return;
+    imagePageSize = btn.dataset.size;
+    imageSizeOptions.querySelectorAll('.image-size-btn').forEach(b => b.classList.toggle('active', b === btn));
+  });
+
+  document.getElementById('imageCancel').addEventListener('click', () => {
+    hideImagePreview();
+    imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
+    imageFiles = [];
+    imageModal.style.display = 'none';
+  });
+
+  document.getElementById('imageConfirm').addEventListener('click', async () => {
+    if (imageFiles.length === 0) { showToast(i18n.t('image_empty')); return; }
+    hideImagePreview();
+    loadingOverlay.style.display = 'flex';
+    try {
+      const { PDFDocument } = await loadPdfLib();
+      const out = await PDFDocument.create();
+      const A4_PORTRAIT = [595.28, 841.89];
+      const A4_LANDSCAPE = [841.89, 595.28];
+      const margin = 24;
+
+      for (const im of imageFiles) {
+        const e = await getRotatedImageEntry(im);
+        let emb;
+        if (e.type === 'png') emb = await out.embedPng(e.bytes);
+        else emb = await out.embedJpg(e.bytes);
+        const iw = e.width, ih = e.height;
+
+        if (imagePageSize === 'original') {
+          const page = out.addPage([iw, ih]);
+          page.drawImage(emb, { x: 0, y: 0, width: iw, height: ih });
+        } else {
+          // 适配 A4：按图片宽高比自动横/竖版面，等比缩放居中
+          const landscape = iw > ih;
+          const [pw, ph] = landscape ? A4_LANDSCAPE : A4_PORTRAIT;
+          const availW = pw - margin * 2, availH = ph - margin * 2;
+          const s = Math.min(availW / iw, availH / ih);
+          const dw = iw * s, dh = ih * s;
+          const page = out.addPage([pw, ph]);
+          page.drawImage(emb, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh });
+        }
+      }
+
+      const pdfBytes = await out.save();
+      const name = (imageFiles.length === 1
+        ? imageFiles[0].file.name.replace(/\.[^.]+$/, '')
+        : 'images') + '.pdf';
+      imageModal.style.display = 'none';
+      const totalOut = out.getPageCount();
+      const ok = await loadPDFFromBytes(pdfBytes, name);
+      if (ok) showToast(i18n.t('image_ok', { n: totalOut }));
+      imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
+      imageFiles = [];
+    } catch (err) {
+      console.error('[PageManager] 图片转PDF失败:', err);
+      showToast(i18n.t('image_fail') + ': ' + (err.message || err));
+      loadingOverlay.style.display = 'none';
+    }
+  });
+
+  // 让删除/提取/合并/图片弹窗可由标题栏拖动
   makeDraggable(mergeModal.querySelector('.text-modal-content'), mergeModal.querySelector('h3'));
   makeDraggable(deleteModal.querySelector('.text-modal-content'), deleteModal.querySelector('h3'));
   makeDraggable(extractModal.querySelector('.text-modal-content'), extractModal.querySelector('h3'));
+  makeDraggable(imageModal.querySelector('.text-modal-content'), imageModal.querySelector('h3'));
 
   // 导出供外部调用
   window.pageManager = {
@@ -429,7 +706,8 @@
     deletePages,
     extractPages,
     restoreAll,
-    openMergeModal
+    openMergeModal,
+    openImageModal
   };
 
   console.log('[PageManager] initialized.');
