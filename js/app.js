@@ -14,6 +14,8 @@ let scale = 1.5;          // 渲染缩放
 let renderTask = null;    // 当前渲染任务（可取消）
 let annotator = null;     // 标注引擎实例
 let pdfFile = null;       // 原始PDF文件
+let originalBytes = null; // 原始PDF字节（始终保留，删除/提取基于此；PDF.js 可能 detach 原数组）
+let pageOrder = [];       // 显示页号(1-based) -> 原始页号(0-based)；删除只改此数组，不重建 PDF
 
 // ===== DOM元素 =====
 const fileInput = document.getElementById('fileInput');
@@ -338,6 +340,7 @@ fileInput.addEventListener('change', async (e) => {
 
     try {
         const arrayBuffer = await file.arrayBuffer();
+        originalBytes = arrayBuffer.slice(0); // 保留副本，删除/提取基于此
         console.log('[PDF.js] Got arrayBuffer, size:', arrayBuffer.byteLength);
 
         const loadingTask = pdfjsLib.getDocument({
@@ -356,6 +359,7 @@ fileInput.addEventListener('change', async (e) => {
         totalPages = pdfDoc.numPages;
         totalPagesEl.textContent = totalPages;
         pageInput.max = totalPages;
+        pageOrder = Array.from({ length: totalPages }, (_, i) => i);
         currentPage = 1;
         pageInput.value = 1;
 
@@ -388,6 +392,9 @@ fileInput.addEventListener('change', async (e) => {
 // ===== 渲染页面 =====
 async function renderPage(pageNum) {
     if (!pdfDoc) return;
+    if (!pageOrder.length) return;
+    const origIdx = pageOrder[pageNum - 1];
+    if (origIdx === undefined) return;
     loadingOverlay.style.display = 'flex';
 
     try {
@@ -395,7 +402,7 @@ async function renderPage(pageNum) {
             renderTask.cancel();
         }
 
-        const page = await pdfDoc.getPage(pageNum);
+        const page = await pdfDoc.getPage(origIdx + 1);
         const viewport = page.getViewport({ scale: scale });
 
         // 设置canvas尺寸 = viewport尺寸（简洁直接，避免DPR transform问题）
@@ -424,7 +431,7 @@ async function renderPage(pageNum) {
         // 设置标注引擎
         annotator.canvas = annotationCanvas;
         annotator.ctx = annotationCanvas.getContext('2d');
-        annotator.setCurrentPage(pageNum - 1); // 0-based
+        annotator.setCurrentPage(origIdx); // 按原始页号存储标注（删页不丢）
 
         // 传递PDF页面对象给标注引擎（用于TextLayer渲染）
         annotator.setPdfPage(page, scale);
@@ -479,7 +486,9 @@ document.getElementById('zoomOut').addEventListener('click', () => {
 
 document.getElementById('fitWidth').addEventListener('click', async () => {
     if (!pdfDoc) return;
-    const page = await pdfDoc.getPage(currentPage);
+    const origIdx = pageOrder[currentPage - 1];
+    if (origIdx === undefined) return;
+    const page = await pdfDoc.getPage(origIdx + 1);
     const baseViewport = page.getViewport({ scale: 1 });
     const containerWidth = viewerContainer.clientWidth - 48;
     scale = containerWidth / baseViewport.width;
@@ -546,24 +555,30 @@ async function exportAnnotatedPDF() {
     try {
         const { PDFDocument } = await loadPdfLib();
 
-        const pdfBytes = await pdfFile.arrayBuffer();
-        const pdfDocLib = await PDFDocument.load(pdfBytes);
-        const pages = pdfDocLib.getPages();
+        const srcBytes = originalBytes || await pdfFile.arrayBuffer();
+        const srcLib = await PDFDocument.load(srcBytes);
+
+        // 构建输出文档：只包含 pageOrder 中的页面（按显示顺序）
+        const outDoc = await PDFDocument.create();
+        const copiedPages = await outDoc.copyPages(srcLib, pageOrder);
+        copiedPages.forEach(p => outDoc.addPage(p));
 
         // 保存标注引擎原始状态
         const origCanvas = annotator.canvas;
         const origCtx = annotator.ctx;
         const origPage = annotator.currentPage;
 
-        for (let i = 0; i < pages.length; i++) {
-            const anns = annotator.getPageAnnotations(i);
+        const outPages = outDoc.getPages();
+        for (let i = 0; i < pageOrder.length; i++) {
+            const origIdx = pageOrder[i];
+            const anns = annotator.getPageAnnotations(origIdx);
             if (anns.length === 0) continue;
 
-            const page = pages[i];
-            const { width: pageWidth, height: pageHeight } = page.getSize();
+            const outPage = outPages[i];
+            const { width: pageWidth, height: pageHeight } = outPage.getSize();
 
             // 获取该页的渲染viewport（与屏幕显示一致）
-            const pdfPage = await pdfDoc.getPage(i + 1);
+            const pdfPage = await pdfDoc.getPage(origIdx + 1);
             const viewport = pdfPage.getViewport({ scale: scale });
 
             // 创建临时canvas，尺寸与屏幕渲染的canvas一致
@@ -575,20 +590,19 @@ async function exportAnnotatedPDF() {
             // 切换标注引擎到临时canvas，绘制该页所有标注
             annotator.canvas = tempCanvas;
             annotator.ctx = tempCtx;
-            annotator.currentPage = i;
+            annotator.currentPage = origIdx;
             annotator.redraw();  // 在临时canvas上重绘该页所有标注
 
-            // 转为PNG（保留透明度）
+            // 转为PNG（保留透明度）并叠加到输出页
             const pngDataUrl = tempCanvas.toDataURL('image/png');
             const pngBase64 = pngDataUrl.split(',')[1];
             const pngBytes = Uint8Array.from(atob(pngBase64), c => c.charCodeAt(0));
-            const pngImage = await pdfDocLib.embedPng(pngBytes);
+            const pngImage = await outDoc.embedPng(pngBytes);
 
-            // 将标注图层叠加到PDF页面上
             // Canvas: 左上角原点，Y向下
             // PDF: 左下角原点，Y向上
             // 图片覆盖整个页面
-            page.drawImage(pngImage, {
+            outPage.drawImage(pngImage, {
                 x: 0,
                 y: 0,
                 width: pageWidth,
@@ -602,7 +616,7 @@ async function exportAnnotatedPDF() {
         annotator.currentPage = origPage;
         annotator.redraw();
 
-        const pdfBytesOut = await pdfDocLib.save();
+        const pdfBytesOut = await outDoc.save();
         const blob = new Blob([pdfBytesOut], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

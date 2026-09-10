@@ -225,6 +225,15 @@
       </div>
 
       <div class="toolbar-right">
+        <div class="page-menu-wrap" id="pageMenuWrap">
+          <button id="pageMenuBtn" class="tool-btn" type="button" data-i18n="page_menu" data-i18n-title="page_menu_tip">页面 ▾</button>
+          <div id="pageMenuDropdown" class="page-menu-dropdown" style="display: none">
+            <button type="button" class="page-menu-item" data-page-action="delete" data-i18n="delete_page">删除页面</button>
+            <button type="button" class="page-menu-item" data-page-action="extract" data-i18n="extract_page">提取页面</button>
+            <div class="page-menu-sep"></div>
+            <button type="button" class="page-menu-item" data-page-action="restore" data-i18n="restore_pages">恢复全部页面</button>
+          </div>
+        </div>
         <button id="undoBtn" class="tool-btn" data-i18n-title="undo" data-i18n="undo">↶ 撤销</button>
         <button id="redoBtn" class="tool-btn" data-i18n-title="redo" data-i18n="redo">↷ 重做</button>
         <button id="clearBtn" class="tool-btn danger" data-i18n-title="clear_page_tip" data-i18n="clear">
@@ -498,6 +507,38 @@
       </div>
     </div>
 
+    <!-- 删除页面弹窗 -->
+    <div id="deleteModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content">
+        <h3 data-i18n="delete_page_title">删除页面</h3>
+        <label class="page-modal-label" data-i18n="page_range_label">页码范围</label>
+        <input type="text" id="deleteRangeInput" class="page-range-input" placeholder="例如 1-3, 5" data-i18n-placeholder="range_placeholder" />
+        <div class="page-total-hint" id="deleteTotalHint"></div>
+        <div class="page-preview" id="deletePreview"></div>
+        <div class="text-modal-hint" data-i18n-html="delete_hint_html">原文件不变 · 可用「恢复全部页面」还原</div>
+        <div class="text-modal-actions">
+          <button id="deleteCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="deleteConfirm" class="tool-btn danger" data-i18n="delete">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提取页面弹窗 -->
+    <div id="extractModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content">
+        <h3 data-i18n="extract_page_title">提取页面</h3>
+        <label class="page-modal-label" data-i18n="page_range_label">页码范围</label>
+        <input type="text" id="extractRangeInput" class="page-range-input" placeholder="例如 1-3, 5" data-i18n-placeholder="range_placeholder" />
+        <div class="page-total-hint" id="extractTotalHint"></div>
+        <div class="page-preview" id="extractPreview"></div>
+        <div class="text-modal-hint" data-i18n-html="extract_hint_html">提取选中页面为新的 PDF 文件下载</div>
+        <div class="text-modal-actions">
+          <button id="extractCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="extractConfirm" class="tool-btn primary" data-i18n="extract_btn">提取并下载</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 加载提示 -->
     <div id="loadingOverlay" class="loading-overlay" style="display: none">
       <div class="spinner"></div>
@@ -509,6 +550,7 @@
 
     <script src="js/annotator.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/pagemanager.js"></script>
     <script>
       var _hmt = _hmt || [];
       (function () {
