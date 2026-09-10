@@ -389,6 +389,50 @@ fileInput.addEventListener('change', async (e) => {
     }
 });
 
+// ===== 从字节加载 PDF（供合并/图片转PDF 复用）=====
+async function loadPDFFromBytes(bytes, displayName) {
+    if (typeof pdfjsLib === 'undefined') {
+        showToast(i18n.t('t_pdfjs_missing'));
+        return false;
+    }
+    loadingOverlay.style.display = 'flex';
+    try {
+        originalBytes = bytes.slice(0);
+        pdfFile = { name: displayName };
+        fileNameEl.textContent = displayName;
+
+        const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
+        pdfDoc = await loadingTask.promise;
+        totalPages = pdfDoc.numPages;
+        totalPagesEl.textContent = totalPages;
+        pageInput.max = totalPages;
+        pageOrder = Array.from({ length: totalPages }, (_, i) => i);
+        currentPage = 1;
+        pageInput.value = 1;
+
+        emptyState.style.display = 'none';
+        pdfViewer.style.display = 'block';
+
+        // 清空标注（新文档）
+        annotator.annotationsByPage = {};
+        annotator.undoStack = [];
+        annotator.redoStack = [];
+
+        await renderPage(currentPage);
+        showToast(i18n.t('t_loaded', { name: displayName, pages: totalPages }));
+        return true;
+    } catch (err) {
+        console.error('[PDF.js] 加载失败:', err);
+        let msg = i18n.t('t_load_failed');
+        if (err.message && err.message.includes('worker')) msg = i18n.t('t_worker_failed');
+        else if (err.name === 'PasswordException') msg = i18n.t('t_encrypted');
+        else if (err.name === 'InvalidPDFException') msg = i18n.t('t_invalid');
+        showToast(msg);
+        loadingOverlay.style.display = 'none';
+        return false;
+    }
+}
+
 // ===== 渲染页面 =====
 async function renderPage(pageNum) {
     if (!pdfDoc) return;

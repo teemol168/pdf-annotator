@@ -731,3 +731,95 @@ body {
     color: #f1c40f;
     background: rgba(241,196,15,0.12);
 }
+
+/* ===== 合并 PDF 弹窗 ===== */
+.merge-dropzone {
+    border: 1.5px dashed var(--border-color);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+    margin-bottom: 12px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.merge-dropzone:hover,
+.merge-dropzone.drag-active {
+    border-color: var(--accent);
+    background: rgba(233,69,96,0.06);
+    color: var(--text-light);
+}
+
+.merge-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 4px;
+}
+
+.merge-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--btn-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    transition: border-color 0.15s;
+}
+
+.merge-item.dragging {
+    opacity: 0.4;
+}
+
+.merge-item.drag-over {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(233,69,96,0.25);
+}
+
+.drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    user-select: none;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.merge-name {
+    flex: 1;
+    color: var(--text-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.merge-pages {
+    color: var(--text-muted);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.merge-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.merge-remove:hover {
+    color: var(--danger);
+    background: rgba(231,76,60,0.12);
+}

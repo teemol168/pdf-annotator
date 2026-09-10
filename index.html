@@ -230,6 +230,7 @@
           <div id="pageMenuDropdown" class="page-menu-dropdown" style="display: none">
             <button type="button" class="page-menu-item" data-page-action="delete" data-i18n="delete_page">删除页面</button>
             <button type="button" class="page-menu-item" data-page-action="extract" data-i18n="extract_page">提取页面</button>
+            <button type="button" class="page-menu-item" data-page-action="merge" data-i18n="merge_pdf">合并 PDF</button>
             <div class="page-menu-sep"></div>
             <button type="button" class="page-menu-item" data-page-action="restore" data-i18n="restore_pages">恢复全部页面</button>
           </div>
@@ -535,6 +536,24 @@
         <div class="text-modal-actions">
           <button id="extractCancel" class="tool-btn" data-i18n="cancel">取消</button>
           <button id="extractConfirm" class="tool-btn primary" data-i18n="extract_btn">提取并下载</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 合并 PDF 弹窗 -->
+    <div id="mergeModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content" style="width: 480px">
+        <h3 data-i18n="merge_title">合并 PDF</h3>
+        <div class="merge-dropzone" id="mergeDropzone">
+          <span data-i18n="merge_drop_hint">点击选择 或 拖拽多个 PDF 到此处</span>
+        </div>
+        <input type="file" id="mergeFileInput" accept="application/pdf,.pdf" multiple style="display: none" />
+        <div class="merge-file-list" id="mergeFileList"></div>
+        <div class="page-total-hint" id="mergeTotalHint"></div>
+        <div class="text-modal-hint" data-i18n-html="merge_hint_html">按顺序合并 · 原文件无损复制</div>
+        <div class="text-modal-actions">
+          <button id="mergeCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="mergeConfirm" class="tool-btn primary" data-i18n="merge_btn">合并并载入</button>
         </div>
       </div>
     </div>

@@ -94,6 +94,40 @@
     return true;
   }
 
+  // ===== 弹窗可拖动（仅标题栏当手柄，不与文件拖放/列表排序冲突）=====
+  function centerModal(content) {
+    content.style.position = '';
+    content.style.left = '';
+    content.style.top = '';
+    content.style.margin = '';
+  }
+  function makeDraggable(modalContent, handle) {
+    if (!modalContent || !handle) return;
+    handle.style.cursor = 'move';
+    handle.addEventListener('mousedown', (e) => {
+      // 不抢按钮/输入框的点击
+      if (e.target.closest('button, input, textarea, select')) return;
+      const rect = modalContent.getBoundingClientRect();
+      modalContent.style.position = 'fixed';
+      modalContent.style.left = rect.left + 'px';
+      modalContent.style.top = rect.top + 'px';
+      modalContent.style.margin = '0';
+      const startX = e.clientX, startY = e.clientY;
+      const baseLeft = rect.left, baseTop = rect.top;
+      function onMove(ev) {
+        modalContent.style.left = (baseLeft + ev.clientX - startX) + 'px';
+        modalContent.style.top = (baseTop + ev.clientY - startY) + 'px';
+      }
+      function onUp() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();
+    });
+  }
+
   // ===== 菜单交互 =====
   const pageMenuBtn = document.getElementById('pageMenuBtn');
   const pageMenuDropdown = document.getElementById('pageMenuDropdown');
@@ -113,8 +147,10 @@
   document.querySelectorAll('.page-menu-item').forEach(item => {
     item.addEventListener('click', () => {
       pageMenuDropdown.style.display = 'none';
-      if (!pdfDoc) { showToast(i18n.t('t_load_first')); return; }
       const action = item.dataset.pageAction;
+      // 合并不需要预加载 PDF（它从多个文件创建新文档），直接开弹窗
+      if (action === 'merge') { openMergeModal(); return; }
+      if (!pdfDoc) { showToast(i18n.t('t_load_first')); return; }
       if (action === 'delete') openDeleteModal();
       else if (action === 'extract') openExtractModal();
       else if (action === 'restore') {
@@ -132,6 +168,7 @@
   function openDeleteModal() {
     deleteRangeInput.value = '';
     updateDeletePreview();
+    centerModal(deleteModal.querySelector('.text-modal-content'));
     deleteModal.style.display = 'flex';
     setTimeout(() => deleteRangeInput.focus(), 0);
   }
@@ -184,6 +221,7 @@
   function openExtractModal() {
     extractRangeInput.value = '';
     updateExtractPreview();
+    centerModal(extractModal.querySelector('.text-modal-content'));
     extractModal.style.display = 'flex';
     setTimeout(() => extractRangeInput.focus(), 0);
   }
@@ -234,12 +272,164 @@
     });
   }
 
+  // ===== 合并 PDF =====
+  const mergeModal = document.getElementById('mergeModal');
+  const mergeDropzone = document.getElementById('mergeDropzone');
+  const mergeFileInput = document.getElementById('mergeFileInput');
+  const mergeFileList = document.getElementById('mergeFileList');
+  const mergeTotalHint = document.getElementById('mergeTotalHint');
+  let mergeFiles = []; // [{ file, doc, pageCount }]
+  let dragSrcIdx = null;
+
+  function openMergeModal() {
+    mergeFiles = [];
+    renderMergeList();
+    centerModal(mergeModal.querySelector('.text-modal-content'));
+    mergeModal.style.display = 'flex';
+  }
+
+  async function addMergeFiles(fileList) {
+    const { PDFDocument } = await loadPdfLib();
+    for (const file of fileList) {
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (!isPdf) continue;
+      try {
+        const bytes = await file.arrayBuffer();
+        const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+        mergeFiles.push({ file, doc, pageCount: doc.getPageCount() });
+      } catch (err) {
+        console.error('[PageManager] 读取失败:', file.name, err);
+        showToast(i18n.t('merge_load_fail', { name: file.name }));
+      }
+    }
+    renderMergeList();
+  }
+
+  function renderMergeList() {
+    mergeFileList.innerHTML = '';
+    mergeFiles.forEach((mf, i) => {
+      const item = document.createElement('div');
+      item.className = 'merge-item';
+      item.dataset.index = i;
+      item.draggable = true;
+      item.innerHTML =
+        '<span class="drag-handle" title="拖拽调序">⋮⋮</span>' +
+        '<span class="merge-name"></span>' +
+        '<span class="merge-pages"></span>' +
+        '<button type="button" class="merge-remove" title="移除">✕</button>';
+      item.querySelector('.merge-name').textContent = mf.file.name;
+      item.querySelector('.merge-pages').textContent = mf.pageCount + ' ' + i18n.t('pages_unit');
+      item.querySelector('.merge-remove').addEventListener('click', (e) => {
+        e.stopPropagation();
+        mergeFiles.splice(i, 1);
+        renderMergeList();
+      });
+      mergeFileList.appendChild(item);
+    });
+    const pages = mergeFiles.reduce((s, mf) => s + mf.pageCount, 0);
+    mergeTotalHint.textContent = mergeFiles.length === 0
+      ? ''
+      : i18n.t('merge_total', { n: mergeFiles.length, pages });
+  }
+
+  // 拖拽调序
+  mergeFileList.addEventListener('dragstart', (e) => {
+    const item = e.target.closest('.merge-item');
+    if (!item) return;
+    dragSrcIdx = parseInt(item.dataset.index);
+    item.classList.add('dragging');
+  });
+  mergeFileList.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const item = e.target.closest('.merge-item');
+    if (item) item.classList.add('drag-over');
+  });
+  mergeFileList.addEventListener('dragleave', (e) => {
+    const item = e.target.closest('.merge-item');
+    if (item) item.classList.remove('drag-over');
+  });
+  mergeFileList.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const item = e.target.closest('.merge-item');
+    if (!item || dragSrcIdx === null) return;
+    const targetIdx = parseInt(item.dataset.index);
+    if (dragSrcIdx !== targetIdx) {
+      const [moved] = mergeFiles.splice(dragSrcIdx, 1);
+      mergeFiles.splice(targetIdx, 0, moved);
+      renderMergeList();
+    }
+  });
+  mergeFileList.addEventListener('dragend', () => {
+    dragSrcIdx = null;
+    mergeFileList.querySelectorAll('.merge-item').forEach(i => i.classList.remove('dragging', 'drag-over'));
+  });
+
+  // 选择文件 / 拖拽进弹窗
+  mergeDropzone.addEventListener('click', () => mergeFileInput.click());
+  mergeFileInput.addEventListener('change', async (e) => {
+    await addMergeFiles(e.target.files);
+    mergeFileInput.value = '';
+  });
+  // 整个弹窗作为放置区：拖偏落到背景/标题也不会被浏览器当成"打开文件"
+  mergeModal.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      mergeDropzone.classList.add('drag-active');
+    }
+  });
+  mergeModal.addEventListener('dragleave', (e) => {
+    if (!mergeModal.contains(e.relatedTarget)) {
+      mergeDropzone.classList.remove('drag-active');
+    }
+  });
+  mergeModal.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    mergeDropzone.classList.remove('drag-active');
+    const files = e.dataTransfer.files;
+    if (files && files.length) {
+      await addMergeFiles(files);
+    }
+  });
+
+  document.getElementById('mergeCancel').addEventListener('click', () => {
+    mergeModal.style.display = 'none';
+  });
+  document.getElementById('mergeConfirm').addEventListener('click', async () => {
+    if (mergeFiles.length === 0) { showToast(i18n.t('merge_empty')); return; }
+    loadingOverlay.style.display = 'flex';
+    try {
+      const { PDFDocument } = await loadPdfLib();
+      const out = await PDFDocument.create();
+      for (const mf of mergeFiles) {
+        const indices = Array.from({ length: mf.pageCount }, (_, i) => i);
+        const copied = await out.copyPages(mf.doc, indices);
+        copied.forEach(p => out.addPage(p));
+      }
+      const merged = await out.save();
+      const name = mergeFiles.length === 1 ? mergeFiles[0].file.name : 'merged.pdf';
+      mergeModal.style.display = 'none';
+      const totalOut = out.getPageCount();
+      const ok = await loadPDFFromBytes(merged, name);
+      if (ok) showToast(i18n.t('merge_ok', { n: mergeFiles.length, pages: totalOut }));
+    } catch (err) {
+      console.error('[PageManager] 合并失败:', err);
+      showToast(i18n.t('merge_fail') + ': ' + (err.message || err));
+      loadingOverlay.style.display = 'none';
+    }
+  });
+
+  // 让删除/提取/合并弹窗可由标题栏拖动
+  makeDraggable(mergeModal.querySelector('.text-modal-content'), mergeModal.querySelector('h3'));
+  makeDraggable(deleteModal.querySelector('.text-modal-content'), deleteModal.querySelector('h3'));
+  makeDraggable(extractModal.querySelector('.text-modal-content'), extractModal.querySelector('h3'));
+
   // 导出供外部调用
   window.pageManager = {
     parsePageRange,
     deletePages,
     extractPages,
-    restoreAll
+    restoreAll,
+    openMergeModal
   };
 
   console.log('[PageManager] initialized.');

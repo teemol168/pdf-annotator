@@ -160,6 +160,19 @@
       "extracted_ok": "已提取 {n} 页并下载",
       "extract_fail": "提取失败",
 
+      // ===== 合并 PDF =====
+      "merge_pdf": "合并 PDF",
+      "merge_title": "合并 PDF",
+      "merge_drop_hint": "点击选择 或 拖拽多个 PDF 到此处",
+      "merge_hint_html": "按顺序合并 · 原文件无损复制",
+      "merge_btn": "合并并载入",
+      "merge_total": "共 {n} 个文件 · 合并后 {pages} 页",
+      "merge_empty": "请添加至少一个 PDF 文件",
+      "merge_load_fail": "无法读取：{name}",
+      "merge_ok": "已合并 {n} 个文件（{pages} 页）",
+      "merge_fail": "合并失败",
+      "pages_unit": "页",
+
       // ===== 语言切换器 =====
       "lang_zh": "中",
       "lang_en": "EN",
@@ -376,6 +389,19 @@
       "restored_ok": "All pages restored",
       "extracted_ok": "Extracted {n} pages and downloaded",
       "extract_fail": "Extract failed",
+
+      // ===== merge PDF =====
+      "merge_pdf": "Merge PDFs",
+      "merge_title": "Merge PDFs",
+      "merge_drop_hint": "Click or drag multiple PDFs here",
+      "merge_hint_html": "Merged in order · original files unchanged",
+      "merge_btn": "Merge & Load",
+      "merge_total": "{n} files · {pages} pages merged",
+      "merge_empty": "Add at least one PDF",
+      "merge_load_fail": "Could not read: {name}",
+      "merge_ok": "Merged {n} files ({pages} pages)",
+      "merge_fail": "Merge failed",
+      "pages_unit": "pages",
 
       // ===== lang switch =====
       "lang_zh": "中",
