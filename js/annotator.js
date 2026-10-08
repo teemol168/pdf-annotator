@@ -149,6 +149,11 @@ class Annotator {
             return;
         }
 
+        // 开始新绘制前清掉旧选中，避免旧选择框残留
+        if (this.selectedAnnotation) {
+            this.deselect();
+        }
+
         this.isDrawing = true;
 
         if (this.tool === 'text') {
@@ -528,8 +533,7 @@ class Annotator {
             rotation: this.rotation,
             opacity: this.opacity
         };
-        this._addAnnotation(annotation);
-        this._drawAnnotation(annotation);
+        this._addAnnotation(annotation); // 内含 redraw + 选中
     }
 
     /**
@@ -749,6 +753,12 @@ class Annotator {
         this.annotationsByPage[this.currentPage].push(ann);
         this._pushUndo({ action: 'add', annotation: ann, page: this.currentPage });
         this.redoStack = [];
+        // 创建后默认选中，便于直接改颜色/字体
+        this.selectedAnnotation = ann;
+        this.selectedIndex = this.annotationsByPage[this.currentPage].length - 1;
+        this._styleUndoSaved = false;
+        if (this.onSelectionChange) this.onSelectionChange(ann);
+        this.redraw();
     }
 
     _pushUndo(entry) {
@@ -866,7 +876,7 @@ class Annotator {
         const anns = this.annotationsByPage[this.currentPage] || [];
         anns.forEach(ann => this._drawAnnotation(ann));
         // 绘制选中指示器
-        if (this.selectedAnnotation && this.tool === 'select') {
+        if (this.selectedAnnotation) {
             this._drawSelectionBox(this.selectedAnnotation);
         }
     }
@@ -1384,6 +1394,11 @@ class Annotator {
         });
         this.redoStack = [];
 
+        // 创建后默认选中
+        this.selectedAnnotation = annotation;
+        this.selectedIndex = this.annotationsByPage[this.currentPage].length - 1;
+        this._styleUndoSaved = false;
+        if (this.onSelectionChange) this.onSelectionChange(annotation);
         this.redraw();
         if (this.onChange) {
             this.onChange(this.getAllAnnotations());
