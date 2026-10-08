@@ -480,6 +480,12 @@ async function renderPage(pageNum) {
         // 传递PDF页面对象给标注引擎（用于TextLayer渲染）
         annotator.setPdfPage(page, scale);
 
+        // 翻页/缩放后重建 textLayer：旧 span 仍按上一帧 viewport 定位，
+        // 与新 canvas 错位会使鼠标拖动一点就命中错位 span、选中一大片
+        if (annotator.textSelectionMode) {
+            await annotator.setTextSelectionMode(true);
+        }
+
         pageInput.value = pageNum;
         updateZoomDisplay();
     } catch (err) {
