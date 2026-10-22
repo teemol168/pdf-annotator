@@ -157,6 +157,7 @@
       "range_empty": "请输入要操作的页码",
       "deleted_pages": "已删除 {n} 页",
       "restored_ok": "已恢复全部页面",
+      "restore_none": "当前没有已删除的页面",
       "extracted_ok": "已提取 {n} 页并下载",
       "extract_fail": "提取失败",
 
@@ -188,6 +189,16 @@
       "image_unsupported": "不支持的格式：{name}（仅 PNG/JPG）",
       "image_ok": "已生成 {n} 页 PDF",
       "image_fail": "生成失败",
+
+      // ===== 图片插入 PDF（追加到当前文档）=====
+      "insert_image": "图片插入 PDF",
+      "image_title_new": "图片转 PDF",
+      "image_title_append": "图片插入 PDF",
+      "image_btn_new": "生成 PDF",
+      "image_btn_append": "追加到文档",
+      "image_hint_append_html": "每张图作为新页追加到当前 PDF 末尾 · 支持 PNG / JPG",
+      "image_need_doc": "请先打开一个 PDF，再插入图片",
+      "image_append_ok": "已追加 {n} 页到文档末尾",
 
       // ===== 语言切换器 =====
       "lang_zh": "中",
@@ -412,6 +423,7 @@
       "range_empty": "Please enter page numbers",
       "deleted_pages": "Deleted {n} pages",
       "restored_ok": "All pages restored",
+      "restore_none": "No deleted pages to restore",
       "extracted_ok": "Extracted {n} pages and downloaded",
       "extract_fail": "Extract failed",
 
@@ -443,6 +455,16 @@
       "image_unsupported": "Unsupported: {name} (PNG/JPG only)",
       "image_ok": "Generated {n}-page PDF",
       "image_fail": "Generate failed",
+
+      // ===== Insert images into current PDF =====
+      "insert_image": "Insert Images",
+      "image_title_new": "Images to PDF",
+      "image_title_append": "Insert Images",
+      "image_btn_new": "Generate PDF",
+      "image_btn_append": "Append to Document",
+      "image_hint_append_html": "Each image becomes a new page at the end of the current PDF · PNG / JPG",
+      "image_need_doc": "Open a PDF first, then insert images",
+      "image_append_ok": "Appended {n} pages to the document",
 
       // ===== lang switch =====
       "lang_zh": "中",

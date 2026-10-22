@@ -389,37 +389,58 @@ fileInput.addEventListener('change', async (e) => {
     }
 });
 
-// ===== 从字节加载 PDF（供合并/图片转PDF 复用）=====
-async function loadPDFFromBytes(bytes, displayName) {
+// ===== 从字节加载 PDF（供合并/图片转PDF/追加图片 复用）=====
+// options: { keepAnnotations, pageOrder, currentPage, silent }
+async function loadPDFFromBytes(bytes, displayName, options) {
+    const opts = options || {};
     if (typeof pdfjsLib === 'undefined') {
         showToast(i18n.t('t_pdfjs_missing'));
         return false;
     }
     loadingOverlay.style.display = 'flex';
     try {
+        // 追加页面时需保留已有标注（页号索引不变，标注天然仍有效）
+        const savedAnnotations = opts.keepAnnotations ? annotator.annotationsByPage : null;
+
         originalBytes = bytes.slice(0);
         pdfFile = { name: displayName };
         fileNameEl.textContent = displayName;
 
         const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
         pdfDoc = await loadingTask.promise;
-        totalPages = pdfDoc.numPages;
+
+        if (opts.pageOrder && opts.pageOrder.length) {
+            pageOrder = opts.pageOrder.slice();
+            // 显示页数以可见页为准（originalBytes 里可能还留着之前删除的页）
+            totalPages = pageOrder.length;
+        } else {
+            totalPages = pdfDoc.numPages;
+            pageOrder = Array.from({ length: totalPages }, (_, i) => i);
+        }
         totalPagesEl.textContent = totalPages;
         pageInput.max = totalPages;
-        pageOrder = Array.from({ length: totalPages }, (_, i) => i);
-        currentPage = 1;
-        pageInput.value = 1;
+
+        currentPage = opts.currentPage || 1;
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        pageInput.value = currentPage;
 
         emptyState.style.display = 'none';
         pdfViewer.style.display = 'block';
 
-        // 清空标注（新文档）
-        annotator.annotationsByPage = {};
-        annotator.undoStack = [];
-        annotator.redoStack = [];
+        if (opts.keepAnnotations) {
+            annotator.annotationsByPage = savedAnnotations || {};
+        } else {
+            // 清空标注（新文档）
+            annotator.annotationsByPage = {};
+            annotator.undoStack = [];
+            annotator.redoStack = [];
+        }
 
         await renderPage(currentPage);
-        showToast(i18n.t('t_loaded', { name: displayName, pages: totalPages }));
+        if (!opts.silent) {
+            showToast(i18n.t('t_loaded', { name: displayName, pages: totalPages }));
+        }
         return true;
     } catch (err) {
         console.error('[PDF.js] 加载失败:', err);

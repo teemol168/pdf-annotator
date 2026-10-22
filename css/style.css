@@ -669,6 +669,15 @@ body {
     background: var(--btn-hover);
 }
 
+.page-menu-item:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+}
+
+.page-menu-item:disabled:hover {
+    background: transparent;
+}
+
 .page-menu-sep {
     height: 1px;
     background: var(--border-color);

@@ -135,6 +135,11 @@
   if (pageMenuBtn) {
     pageMenuBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      // 打开菜单前同步「恢复全部页面」可用状态：没删过页或未加载 PDF 时置灰
+      const restoreItem = pageMenuDropdown.querySelector('[data-page-action="restore"]');
+      if (restoreItem) {
+        restoreItem.disabled = !pdfDoc || pageOrder.length >= pdfDoc.numPages;
+      }
       pageMenuDropdown.style.display =
         pageMenuDropdown.style.display === 'none' ? 'block' : 'none';
     });
@@ -150,12 +155,21 @@
       const action = item.dataset.pageAction;
       // 合并不需要预加载 PDF（它从多个文件创建新文档），直接开弹窗
       if (action === 'merge') { openMergeModal(); return; }
-      if (action === 'image') { openImageModal(); return; }
+      if (action === 'image') { openImageModal('new'); return; }
+      if (action === 'insertImage') {
+        if (!pdfDoc) { showToast(i18n.t('image_need_doc')); return; }
+        openImageModal('append');
+        return;
+      }
       if (!pdfDoc) { showToast(i18n.t('t_load_first')); return; }
       if (action === 'delete') openDeleteModal();
       else if (action === 'extract') openExtractModal();
       else if (action === 'restore') {
-        if (restoreAll()) showToast(i18n.t('restored_ok'));
+        if (pageOrder.length >= pdfDoc.numPages) {
+          showToast(i18n.t('restore_none'));
+        } else if (restoreAll()) {
+          showToast(i18n.t('restored_ok'));
+        }
       }
     });
   });
@@ -419,16 +433,22 @@
     }
   });
 
-  // ===== 图片转 PDF =====
+  // ===== 图片转 PDF / 图片插入 PDF =====
   const imageModal = document.getElementById('imageModal');
   const imageDropzone = document.getElementById('imageDropzone');
   const imageFileInput = document.getElementById('imageFileInput');
   const imageList = document.getElementById('imageList');
   const imageTotalHint = document.getElementById('imageTotalHint');
   const imageSizeOptions = document.getElementById('imageSizeOptions');
+  const imageModalTitle = document.getElementById('imageModalTitle');
+  const imageHintEl = document.getElementById('imageHintEl');
+  const imageConfirmBtn = document.getElementById('imageConfirm');
   let imageFiles = []; // [{ file, type:'png'|'jpg', width, height, url, rotation }]
   let imagePageSize = 'original'; // 'original' | 'a4'
   let imageDragSrc = null;
+  // 'new' = 仅用图片生成新 PDF；'append' = 追加到当前 PDF 末尾
+  let imageMode = 'new';
+  const MAX_IMAGE_EDGE = 2000; // 长边超过此值时压缩，避免生成超大 PDF
 
   // 缩略图悬浮大图预览
   let imagePreviewEl = null;
@@ -460,10 +480,23 @@
     if (imagePreviewEl) imagePreviewEl.style.display = 'none';
   }
 
-  function openImageModal() {
+  function openImageModal(mode) {
+    imageMode = mode === 'append' ? 'append' : 'new';
     imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
     imageFiles = [];
     renderImageList();
+
+    // 按模式切换标题 / 按钮 / 提示文案
+    if (imageMode === 'append') {
+      if (imageModalTitle) imageModalTitle.textContent = i18n.t('image_title_append');
+      if (imageConfirmBtn) imageConfirmBtn.textContent = i18n.t('image_btn_append');
+      if (imageHintEl) imageHintEl.innerHTML = i18n.t('image_hint_append_html');
+    } else {
+      if (imageModalTitle) imageModalTitle.textContent = i18n.t('image_title_new');
+      if (imageConfirmBtn) imageConfirmBtn.textContent = i18n.t('image_btn_new');
+      if (imageHintEl) imageHintEl.innerHTML = i18n.t('image_hint_html');
+    }
+
     centerModal(imageModal.querySelector('.text-modal-content'));
     imageModal.style.display = 'flex';
   }
@@ -487,25 +520,38 @@
     });
   }
 
-  // 按用户设定的旋转角，用 canvas 生成旋转后的图片字节（返回新尺寸/类型）
+  // 按需旋转 + 压缩（长边限制 MAX_IMAGE_EDGE），返回最终图片字节/尺寸/类型
   async function getRotatedImageEntry(im) {
     const rot = (im.rotation || 0) % 360;
-    if (!rot) {
-      const bytes = await im.file.arrayBuffer();
-      return { bytes, width: im.width, height: im.height, type: im.type };
-    }
     const w = im.width, h = im.height;
+    const longEdge = Math.max(w, h);
+    const needResize = longEdge > MAX_IMAGE_EDGE;
+
+    // 未旋转且尺寸不大：直接用原始字节，零画质损失、速度最快
+    if (!rot && !needResize) {
+      const bytes = await im.file.arrayBuffer();
+      return { bytes, width: w, height: h, type: im.type };
+    }
+
+    const scale = needResize ? (MAX_IMAGE_EDGE / longEdge) : 1;
+    const dw = Math.max(1, Math.round(w * scale));
+    const dh = Math.max(1, Math.round(h * scale));
+    const swap = (rot === 90 || rot === 270);
+
     const canvas = document.createElement('canvas');
-    if (rot === 90 || rot === 270) { canvas.width = h; canvas.height = w; }
-    else { canvas.width = w; canvas.height = h; }
+    canvas.width = swap ? dh : dw;
+    canvas.height = swap ? dw : dh;
     const ctx = canvas.getContext('2d');
     ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate(rot * Math.PI / 180);
+    if (rot) ctx.rotate(rot * Math.PI / 180);
     const img = await loadImageEl(im.url);
-    ctx.drawImage(img, -w / 2, -h / 2, w, h);
-    const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+    ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+
+    // JPG 保持 JPG（体积远小于 PNG），PNG 保留透明度
+    const mime = im.type === 'jpg' ? 'image/jpeg' : 'image/png';
+    const blob = await new Promise(res => canvas.toBlob(res, mime, 0.92));
     const bytes = await blob.arrayBuffer();
-    return { bytes, width: canvas.width, height: canvas.height, type: 'png' };
+    return { bytes, width: canvas.width, height: canvas.height, type: im.type };
   }
 
   async function addImageFiles(fileList) {
@@ -644,51 +690,101 @@
     imageModal.style.display = 'none';
   });
 
+  // 按当前「页面尺寸」设置把图片写入目标文档，每张图一页
+  async function addImagePagesTo(out, imgs) {
+    const A4_PORTRAIT = [595.28, 841.89];
+    const A4_LANDSCAPE = [841.89, 595.28];
+    const margin = 24;
+
+    for (const im of imgs) {
+      const e = await getRotatedImageEntry(im);
+      let emb;
+      if (e.type === 'png') emb = await out.embedPng(e.bytes);
+      else emb = await out.embedJpg(e.bytes);
+      const iw = e.width, ih = e.height;
+
+      if (imagePageSize === 'original') {
+        const page = out.addPage([iw, ih]);
+        page.drawImage(emb, { x: 0, y: 0, width: iw, height: ih });
+      } else {
+        // 适配 A4：按图片宽高比自动横/竖版面，等比缩放居中
+        const landscape = iw > ih;
+        const [pw, ph] = landscape ? A4_LANDSCAPE : A4_PORTRAIT;
+        const availW = pw - margin * 2, availH = ph - margin * 2;
+        const s = Math.min(availW / iw, availH / ih);
+        const dw = iw * s, dh = ih * s;
+        const page = out.addPage([pw, ph]);
+        page.drawImage(emb, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh });
+      }
+    }
+    return imgs.length;
+  }
+
+  function clearImageFiles() {
+    imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
+    imageFiles = [];
+  }
+
   document.getElementById('imageConfirm').addEventListener('click', async () => {
     if (imageFiles.length === 0) { showToast(i18n.t('image_empty')); return; }
     hideImagePreview();
     loadingOverlay.style.display = 'flex';
     try {
       const { PDFDocument } = await loadPdfLib();
-      const out = await PDFDocument.create();
-      const A4_PORTRAIT = [595.28, 841.89];
-      const A4_LANDSCAPE = [841.89, 595.28];
-      const margin = 24;
 
-      for (const im of imageFiles) {
-        const e = await getRotatedImageEntry(im);
-        let emb;
-        if (e.type === 'png') emb = await out.embedPng(e.bytes);
-        else emb = await out.embedJpg(e.bytes);
-        const iw = e.width, ih = e.height;
-
-        if (imagePageSize === 'original') {
-          const page = out.addPage([iw, ih]);
-          page.drawImage(emb, { x: 0, y: 0, width: iw, height: ih });
-        } else {
-          // 适配 A4：按图片宽高比自动横/竖版面，等比缩放居中
-          const landscape = iw > ih;
-          const [pw, ph] = landscape ? A4_LANDSCAPE : A4_PORTRAIT;
-          const availW = pw - margin * 2, availH = ph - margin * 2;
-          const s = Math.min(availW / iw, availH / ih);
-          const dw = iw * s, dh = ih * s;
-          const page = out.addPage([pw, ph]);
-          page.drawImage(emb, { x: (pw - dw) / 2, y: (ph - dh) / 2, width: dw, height: dh });
+      // ===== 模式 append：图片追加到当前 PDF 末尾，原页与标注保持不变 =====
+      if (imageMode === 'append') {
+        if (!originalBytes) {
+          showToast(i18n.t('image_need_doc'));
+          loadingOverlay.style.display = 'none';
+          return;
         }
+
+        const src = await PDFDocument.load(originalBytes.slice(0));
+        const baseCount = src.getPageCount();
+        const out = await PDFDocument.create();
+        // 原页按原顺序全量复制（含已删除页），保证原始页号与标注索引不变
+        const copied = await out.copyPages(src, src.getPageIndices());
+        copied.forEach(p => out.addPage(p));
+
+        const added = await addImagePagesTo(out, imageFiles);
+        const pdfBytes = await out.save();
+
+        // 显示顺序 = 原有可见页 + 新增图片页
+        const newOrder = pageOrder.slice();
+        for (let i = 0; i < added; i++) newOrder.push(baseCount + i);
+
+        const name = (typeof pdfFile !== 'undefined' && pdfFile && pdfFile.name)
+          ? pdfFile.name : 'document.pdf';
+        const firstNewDisplay = newOrder.length - added + 1;
+
+        imageModal.style.display = 'none';
+        const ok = await loadPDFFromBytes(pdfBytes, name, {
+          keepAnnotations: true,
+          pageOrder: newOrder,
+          currentPage: firstNewDisplay,
+          silent: true
+        });
+        if (ok) showToast(i18n.t('image_append_ok', { n: added }));
+        clearImageFiles();
+        return;
       }
 
+      // ===== 模式 new：仅用图片生成新的 PDF 文档 =====
+      const out = await PDFDocument.create();
+      await addImagePagesTo(out, imageFiles);
       const pdfBytes = await out.save();
       const name = (imageFiles.length === 1
         ? imageFiles[0].file.name.replace(/\.[^.]+$/, '')
         : 'images') + '.pdf';
-      imageModal.style.display = 'none';
       const totalOut = out.getPageCount();
+
+      imageModal.style.display = 'none';
       const ok = await loadPDFFromBytes(pdfBytes, name);
       if (ok) showToast(i18n.t('image_ok', { n: totalOut }));
-      imageFiles.forEach(im => { if (im.url) URL.revokeObjectURL(im.url); });
-      imageFiles = [];
+      clearImageFiles();
     } catch (err) {
-      console.error('[PageManager] 图片转PDF失败:', err);
+      console.error('[PageManager] 图片处理失败:', err);
       showToast(i18n.t('image_fail') + ': ' + (err.message || err));
       loadingOverlay.style.display = 'none';
     }
