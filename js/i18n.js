@@ -9,7 +9,7 @@
   const dict = {
     zh: {
       // ===== 品牌/通用 =====
-      "brand": "谜语猜猜",
+      "brand": "米鱼菜菜",
       "brand_sub": "作品集",
       "back_to_home": "返回 谜语猜猜 个人作品集",
 
