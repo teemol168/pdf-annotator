@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ===== hreflang（中文=国内主域 /pdf.html，英文=海外 pdfmark/pdf.html） ===== -->
+    <link id="hl_zh" rel="alternate" hreflang="zh-CN" href="https://miyucaicai.cn/pdf.html" />
+    <link id="hl_en" rel="alternate" hreflang="en" href="https://pdfmark.miyucaicai.cn/pdf.html" />
+    <link id="hl_x" rel="alternate" hreflang="x-default" href="https://pdfmark.miyucaicai.cn/pdf.html" />
+
+    <!-- ===== 核心 SEO（i18n 运行后按语言切换 content） ===== -->
+    <title id="i18n_doc_title">PDF标注工具 - 在线PDF编辑、画线、文字标注 | 免费PDF批注工具</title>
+    <meta
+      id="i18n_meta_desc"
+      name="description"
+      content="免费在线PDF标注工具，支持在PDF上画线、添加文字标注、设置颜色和字体、高亮标记、箭头指引、矩形框选等。可选中标注进行移动、编辑、修改样式，支持撤销重做，标注完成后可导出PDF文件。无需安装，浏览器直接使用。"
+    />
+    <meta
+      name="keywords"
+      content="PDF标注,PDF编辑,PDF画线,PDF文字标注,PDF批注,PDF注释,PDF高亮,在线PDF工具,PDF markup,PDF annotation,PDF editor,free PDF tool,PDF annotator,online PDF markup"
+    />
+    <meta name="author" content="PDF标注工具" />
+    <meta name="robots" content="index, follow" />
+    <meta name="language" content="zh-CN" />
+    <meta name="revisit-after" content="7 days" />
+
+    <!-- ===== Open Graph（社交分享） ===== -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PDF标注工具" />
+    <meta
+      id="i18n_og_title"
+      property="og:title"
+      content="PDF标注工具 - 在线PDF编辑、画线、文字标注"
+    />
+    <meta
+      id="i18n_og_desc"
+      property="og:description"
+      content="免费在线PDF标注工具，支持画线、文字标注、颜色字体设置、高亮标记，标注后可导出PDF。浏览器直接使用，无需安装。"
+    />
+    <meta id="i18n_og_locale" property="og:locale" content="zh_CN" />
+    <meta id="og_url" property="og:url" content="https://miyucaicai.cn/pdf.html" />
+
+    <!-- ===== Twitter Cards ===== -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      id="i18n_twitter_title"
+      name="twitter:title"
+      content="PDF标注工具 - 在线PDF编辑、画线、文字标注"
+    />
+    <meta
+      id="i18n_twitter_desc"
+      name="twitter:description"
+      content="免费在线PDF标注工具，支持画线、文字标注、高亮标记，标注后可导出PDF。"
+    />
+
+    <!-- ===== Canonical ===== -->
+    <link id="canonical" rel="canonical" href="https://miyucaicai.cn/pdf.html" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+    <!-- Sitemap 引用 -->
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- ===== 结构化数据 (JSON-LD) - Google 富摘要 ===== -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PDF标注工具",
+        "url": "https://miyucaicai.cn/pdf.html",
+        "description": "免费在线PDF标注工具，支持在PDF上画线、添加文字标注、设置颜色和字体、高亮标记、箭头指引。可选中标注进行移动、编辑、修改样式，标注完成后导出PDF文件。",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web Browser",
+        "browserRequirements": "Requires JavaScript. Requires HTML5 Canvas support.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "CNY"
+        },
+        "featureList": [
+          "PDF画线标注",
+          "PDF文字标注",
+          "PDF直线绘制",
+          "PDF箭头标注",
+          "PDF矩形框选",
+          "PDF高亮标记",
+          "PDF颜色设置",
+          "PDF字体设置",
+          "标注选择移动编辑",
+          "撤销重做",
+          "导出标注PDF"
+        ],
+        "inLanguage": ["zh-CN", "en"]
+      }
+    </script>
+
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+      /* 品牌返回链接（工具栏左上角，链接到个人作品集首页） */
+      .brand-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 12px 5px 8px;
+        margin-right: 6px;
+        border-radius: 8px;
+        color: var(--text-light);
+        font-size: 14px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background 0.2s, transform 0.2s;
+      }
+      .brand-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        transform: translateY(-1px);
+      }
+      .brand-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #8b7cff, #5eead4);
+        box-shadow: 0 0 10px rgba(139, 124, 255, 0.7);
+        flex-shrink: 0;
+      }
+      .brand-sub {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--text-muted);
+        border-left: 1px solid var(--border-color);
+        padding-left: 8px;
+        margin-left: 2px;
+      }
+      @media (max-width: 760px) {
+        .brand-sub { display: none; }
+      }
+      @media (max-width: 520px) {
+        .brand-name { display: none; }
+      }
+
+      /* 语言切换器 */
+      .lang-switch {
+        display: inline-flex;
+        gap: 0;
+        margin-left: 8px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .lang-btn {
+        background: var(--btn-bg);
+        color: var(--text-muted);
+        border: none;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-weight: 600;
+      }
+      .lang-btn:hover {
+        background: var(--btn-hover);
+        color: var(--text-light);
+      }
+      .lang-btn.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* 功能详情区（可见的 SEO 友好说明，替代原隐藏文本块） */
+      .seo-details {
+        max-width: 660px;
+        margin: 28px auto 8px;
+        padding: 22px 24px 4px;
+        border-top: 1px solid var(--border-color);
+        text-align: left;
+        color: var(--text-muted);
+        font-size: 13px;
+        line-height: 1.85;
+      }
+      .seo-details h2 {
+        color: var(--text-light);
+        font-size: 15px;
+        margin: 14px 0 6px;
+        font-weight: 600;
+      }
+      .seo-details h2:first-child { margin-top: 0; }
+      .seo-details ul { padding-left: 20px; margin: 4px 0; }
+      .seo-details li { margin: 3px 0; }
+      .seo-details p { margin: 6px 0; }
+    </style>
+    <!-- PDF.js 主库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- i18n 语言包（需在 app.js 之前加载） -->
+    <script src="js/i18n.js"></script>
+  </head>
+  <body>
+    <!-- 顶部工具栏 -->
+    <header class="toolbar">
+      <div class="toolbar-left">
+        <a class="brand-link" href="index.html" data-i18n-title="back_to_home" data-i18n-aria="back_to_home">
+          <span class="brand-dot"></span>
+          <span class="brand-name" data-i18n="brand">米鱼菜菜</span>
+          <span class="brand-sub" data-i18n="brand_sub">作品集</span>
+        </a>
+        <label class="file-upload-btn">
+          <input type="file" id="fileInput" accept=".pdf" hidden />
+          <span data-i18n="open_pdf">📁 打开 PDF</span>
+        </label>
+        <span id="fileName" class="file-name" data-i18n="no_file">未加载文件</span>
+      </div>
+
+      <div class="toolbar-center">
+        <button id="prevPage" class="tool-btn" data-i18n-title="prev_page">◀</button>
+        <span class="page-info">
+          <span data-i18n="page_prefix">第 </span><input type="number" id="pageInput" value="1" min="1" /> /
+          <span id="totalPages">0</span><span data-i18n="page_suffix"> 页</span>
+        </span>
+        <button id="nextPage" class="tool-btn" data-i18n-title="next_page">▶</button>
+        <span class="divider"></span>
+        <button id="zoomOut" class="tool-btn" data-i18n-title="zoom_out">−</button>
+        <span id="zoomLevel" class="zoom-level">100%</span>
+        <button id="zoomIn" class="tool-btn" data-i18n-title="zoom_in">+</button>
+        <button id="fitWidth" class="tool-btn" data-i18n-title="fit_width">⤢</button>
+      </div>
+
+      <div class="toolbar-right">
+        <div class="page-menu-wrap" id="pageMenuWrap">
+          <button id="pageMenuBtn" class="tool-btn" type="button" data-i18n="page_menu" data-i18n-title="page_menu_tip">页面 ▾</button>
+          <div id="pageMenuDropdown" class="page-menu-dropdown" style="display: none">
+            <button type="button" class="page-menu-item" data-page-action="delete" data-i18n="delete_page">删除页面</button>
+            <button type="button" class="page-menu-item" data-page-action="extract" data-i18n="extract_page">提取页面</button>
+            <button type="button" class="page-menu-item" data-page-action="merge" data-i18n="merge_pdf">合并 PDF</button>
+            <button type="button" class="page-menu-item" data-page-action="image" data-i18n="image_to_pdf">图片转 PDF</button>
+            <button type="button" class="page-menu-item" data-page-action="insertImage" data-i18n="insert_image">图片插入 PDF</button>
+            <div class="page-menu-sep"></div>
+            <button type="button" class="page-menu-item" data-page-action="restore" data-i18n="restore_pages">恢复全部页面</button>
+          </div>
+        </div>
+        <button id="undoBtn" class="tool-btn" data-i18n-title="undo" data-i18n="undo">↶ 撤销</button>
+        <button id="redoBtn" class="tool-btn" data-i18n-title="redo" data-i18n="redo">↷ 重做</button>
+        <button id="clearBtn" class="tool-btn danger" data-i18n-title="clear_page_tip" data-i18n="clear">
+          🗑 清除
+        </button>
+        <button id="exportBtn" class="tool-btn primary" data-i18n-title="export_tip" data-i18n="export_pdf">
+          ⬇ 导出 PDF
+        </button>
+        <div class="lang-switch" title="Language / 语言">
+          <button data-lang-btn="zh" class="lang-btn active" data-i18n="lang_zh">中</button>
+          <button data-lang-btn="en" class="lang-btn" data-i18n="lang_en">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 主体区域：侧边栏 + 查看区 -->
+    <div class="main-content">
+      <!-- 左侧工具面板 -->
+      <aside class="side-panel">
+        <div class="tool-section">
+          <h3 data-i18n="draw_tools">绘图工具</h3>
+          <div class="tool-buttons">
+            <button
+              class="tool-select active"
+              data-tool="select"
+              data-i18n-title="tool_select_tip"
+            >
+              🖱 <span data-i18n="tool_select">选择</span>
+            </button>
+            <button class="tool-select" data-tool="pen" data-i18n-title="tool_pen_tip">
+              ✏️ <span data-i18n="tool_pen">画笔</span>
+            </button>
+            <button class="tool-select" data-tool="line" data-i18n-title="tool_line_tip">
+              📏 <span data-i18n="tool_line">直线</span>
+            </button>
+            <button class="tool-select" data-tool="arrow" data-i18n-title="tool_arrow_tip">
+              ➤ <span data-i18n="tool_arrow">箭头</span>
+            </button>
+            <button class="tool-select" data-tool="rect" data-i18n-title="tool_rect_tip">
+              ⬜ <span data-i18n="tool_rect">矩形</span>
+            </button>
+            <button class="tool-select" data-tool="text" data-i18n-title="tool_text_tip">
+              🔤 <span data-i18n="tool_text">文字</span>
+            </button>
+            <button class="tool-select" data-tool="highlight" data-i18n-title="tool_highlight_tip">
+              🖌 <span data-i18n="tool_highlight">高亮</span>
+            </button>
+            <button class="tool-select" data-tool="wavyline" data-i18n-title="tool_wavy_tip">
+              〰️ <span data-i18n="tool_wavy">波浪线</span>
+            </button>
+            <button class="tool-select" data-tool="texthighlight" data-i18n-title="tool_textrhighlight_tip">
+              📝 <span data-i18n="tool_textrhighlight">文字高亮</span>
+            </button>
+            <button class="tool-select" data-tool="eraser" data-i18n-title="tool_eraser_tip">
+              🧽 <span data-i18n="tool_eraser">橡皮</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3 data-i18n="color">颜色</h3>
+          <div class="color-picker-row">
+            <div class="color-swatches" id="colorSwatches">
+              <button
+                class="color-swatch active"
+                style="background: #e74c3c"
+                data-color="#e74c3c"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #e67e22"
+                data-color="#e67e22"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #f1c40f"
+                data-color="#f1c40f"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #2ecc71"
+                data-color="#2ecc71"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #3498db"
+                data-color="#3498db"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #9b59b6"
+                data-color="#9b59b6"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #34495e"
+                data-color="#34495e"
+              ></button>
+              <button
+                class="color-swatch"
+                style="background: #ffffff; border: 1px solid #ccc"
+                data-color="#ffffff"
+              ></button>
+            </div>
+            <input
+              type="color"
+              id="customColor"
+              value="#e74c3c"
+              data-i18n-title="custom_color"
+            />
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3 data-i18n="line_width">线条粗细</h3>
+          <div class="slider-row">
+            <input type="range" id="lineWidth" min="1" max="20" value="2" />
+            <span id="lineWidthValue" class="slider-value">2px</span>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3 data-i18n="text_settings">文字设置</h3>
+          <label data-i18n="font">字体</label>
+          <select id="fontFamily">
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="'Times New Roman', serif">Times New Roman</option>
+            <option value="'Courier New', monospace">Courier New</option>
+            <option value="Georgia, serif">Georgia</option>
+            <option value="'Microsoft YaHei', sans-serif">微软雅黑</option>
+            <option value="'SimSun', serif">宋体</option>
+            <option value="'KaiTi', serif">楷体</option>
+            <option value="'SimHei', sans-serif">黑体</option>
+          </select>
+          <label data-i18n="font_size">字号</label>
+          <div class="slider-row">
+            <input type="range" id="fontSize" min="8" max="72" value="16" />
+            <span id="fontSizeValue" class="slider-value">16px</span>
+          </div>
+          <div class="text-style-buttons">
+            <button id="boldBtn" class="style-btn" data-i18n-title="bold">
+              <b>B</b>
+            </button>
+            <button id="italicBtn" class="style-btn" data-i18n-title="italic">
+              <i>I</i>
+            </button>
+            <button id="underlineBtn" class="style-btn" data-i18n-title="underline">
+              <u>U</u>
+            </button>
+          </div>
+          <label data-i18n="rotation">旋转角度</label>
+          <div class="slider-row">
+            <input
+              type="range"
+              id="rotation"
+              min="0"
+              max="360"
+              value="0"
+              step="1"
+            />
+            <span id="rotationValue" class="slider-value">0°</span>
+          </div>
+          <div class="rotation-presets">
+            <button data-rot="0" class="rot-preset">0°</button>
+            <button data-rot="45" class="rot-preset">45°</button>
+            <button data-rot="90" class="rot-preset">90°</button>
+            <button data-rot="180" class="rot-preset">180°</button>
+            <button data-rot="270" class="rot-preset">270°</button>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3 data-i18n="opacity">不透明度</h3>
+          <div class="slider-row">
+            <input type="range" id="opacity" min="10" max="100" value="100" />
+            <span id="opacityValue" class="slider-value">100%</span>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <h3 data-i18n="tips">操作提示</h3>
+          <div
+            class="tips-box"
+            style="font-size: 12px; line-height: 1.8; color: var(--text-muted)"
+            data-i18n-html="tips_html"
+          >
+            🖱 <b>选择</b>：点击标注选中<br />
+            &nbsp;&nbsp;&nbsp;拖拽移动，双击文字编辑<br />
+            &nbsp;&nbsp;&nbsp;Delete 键删除选中<br />
+            ✏️ <b>画笔/直线/箭头</b>：拖拽绘制<br />
+            🔤 <b>文字</b>：点击位置输入<br />
+            &nbsp;&nbsp;&nbsp;Enter 换行，Ctrl+Enter 确认<br />
+            🧽 <b>橡皮</b>：点击标注擦除
+          </div>
+        </div>
+      </aside>
+
+      <!-- PDF显示区域 -->
+      <main class="viewer-container" id="viewerContainer">
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon">📄</div>
+          <h1 data-i18n="empty_h1">PDF标注工具 - 在线PDF编辑、画线、文字标注</h1>
+          <p data-i18n-html="empty_p">
+            点击「打开 PDF」上传文件<br />支持画线、文字标注、颜色和字体设置
+          </p>
+          <div class="features">
+            <div class="feature-item" data-i18n="feat_pen">✏️ 自由画笔 & 直线</div>
+            <div class="feature-item" data-i18n="feat_text">🔤 文字标注</div>
+            <div class="feature-item" data-i18n="feat_color">🎨 颜色 & 字体</div>
+            <div class="feature-item" data-i18n="feat_arrow">➤ 箭头 & 矩形框</div>
+            <div class="feature-item" data-i18n="feat_highlight">🖌 高亮标记</div>
+            <div class="feature-item" data-i18n="feat_select">🖱 选择/移动/编辑</div>
+            <div class="feature-item" data-i18n="feat_undo">↶ 撤销/重做</div>
+            <div class="feature-item" data-i18n="feat_export">⬇ 导出标注PDF</div>
+          </div>
+
+          <!-- 功能详情：可见的 SEO 友好说明（替代原隐藏文本，避免被判作弊） -->
+          <div class="seo-details">
+            <h2 data-i18n="seo_h1">PDF在线标注与编辑功能</h2>
+            <p data-i18n="seo_p1">
+              本工具提供全面的PDF标注功能，包括：在PDF文件上自由画线、绘制直线和箭头、添加文字标注并设置字体大小和颜色、使用矩形框选区域、高亮标记重点内容。所有标注均可选中后移动、编辑文字内容、修改颜色字体大小等样式，支持撤销和重做操作，完成标注后可导出为新的PDF文件。完全免费，无需安装软件，在浏览器中即可使用。
+            </p>
+            <h2 data-i18n="seo_h2">支持的标注类型</h2>
+            <ul>
+              <li data-i18n="seo_li1">画笔标注：在PDF上自由手绘线条</li>
+              <li data-i18n="seo_li2">直线标注：绘制精确直线</li>
+              <li data-i18n="seo_li3">箭头标注：绘制带箭头的指引线</li>
+              <li data-i18n="seo_li4">矩形标注：框选PDF区域</li>
+              <li data-i18n="seo_li5">文字标注：在PDF任意位置添加文字，可选字体、字号、颜色、粗体、斜体、下划线</li>
+              <li data-i18n="seo_li6">高亮标注：半透明高亮笔标记</li>
+              <li data-i18n="seo_li7">橡皮擦：删除不需要的标注</li>
+            </ul>
+            <h2 data-i18n="seo_h3">PDF标注使用场景</h2>
+            <p data-i18n="seo_p2">
+              适用于合同审阅、论文批注、图纸标记、法律文书标注、教学课件批注、设计稿审阅等多种场景。支持中文和英文字体，包括微软雅黑、宋体、楷体、黑体、Arial、Times New Roman等。标注后可一键导出PDF，方便分享和存档。
+            </p>
+          </div>
+
+          <noscript>
+            <p>
+              本工具需要 JavaScript 支持。请启用浏览器 JavaScript 后使用 PDF
+              标注功能。
+            </p>
+          </noscript>
+        </div>
+        <div id="pdfViewer" class="pdf-viewer" style="display: none">
+          <canvas id="pdfCanvas"></canvas>
+          <canvas id="annotationCanvas" class="annotation-layer"></canvas>
+        </div>
+      </main>
+    </div>
+    <!-- /main-content -->
+
+    <!-- 文字输入弹窗 -->
+    <div id="textInputModal" class="text-modal" style="display: none">
+      <div class="text-modal-content">
+        <h3 data-i18n="text_modal_title">输入标注文字</h3>
+        <textarea
+          id="textInputArea"
+          placeholder="在此输入文字...&#10;（按 Enter 换行）"
+          data-i18n-placeholder="text_modal_placeholder"
+          rows="5"
+        ></textarea>
+        <div class="text-modal-hint" data-i18n-html="text_modal_hint">
+          按 <b>Enter</b> 换行，<b>Esc</b> 取消
+        </div>
+        <div class="text-modal-actions">
+          <button id="textCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="textConfirm" class="tool-btn primary" data-i18n="confirm">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 删除页面弹窗 -->
+    <div id="deleteModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content">
+        <h3 data-i18n="delete_page_title">删除页面</h3>
+        <label class="page-modal-label" data-i18n="page_range_label">页码范围</label>
+        <input type="text" id="deleteRangeInput" class="page-range-input" placeholder="例如 1-3, 5" data-i18n-placeholder="range_placeholder" />
+        <div class="page-total-hint" id="deleteTotalHint"></div>
+        <div class="page-preview" id="deletePreview"></div>
+        <div class="text-modal-hint" data-i18n-html="delete_hint_html">原文件不变 · 可用「恢复全部页面」还原</div>
+        <div class="text-modal-actions">
+          <button id="deleteCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="deleteConfirm" class="tool-btn danger" data-i18n="delete">删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提取页面弹窗 -->
+    <div id="extractModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content">
+        <h3 data-i18n="extract_page_title">提取页面</h3>
+        <label class="page-modal-label" data-i18n="page_range_label">页码范围</label>
+        <input type="text" id="extractRangeInput" class="page-range-input" placeholder="例如 1-3, 5" data-i18n-placeholder="range_placeholder" />
+        <div class="page-total-hint" id="extractTotalHint"></div>
+        <div class="page-preview" id="extractPreview"></div>
+        <div class="text-modal-hint" data-i18n-html="extract_hint_html">提取选中页面为新的 PDF 文件下载</div>
+        <div class="text-modal-actions">
+          <button id="extractCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="extractConfirm" class="tool-btn primary" data-i18n="extract_btn">提取并下载</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 合并 PDF 弹窗 -->
+    <div id="mergeModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content" style="width: 480px">
+        <h3 data-i18n="merge_title">合并 PDF</h3>
+        <div class="merge-dropzone" id="mergeDropzone">
+          <span data-i18n="merge_drop_hint">点击选择 或 拖拽多个 PDF 到此处</span>
+        </div>
+        <input type="file" id="mergeFileInput" accept="application/pdf,.pdf" multiple style="display: none" />
+        <div class="merge-file-list" id="mergeFileList"></div>
+        <div class="page-total-hint" id="mergeTotalHint"></div>
+        <div class="text-modal-hint" data-i18n-html="merge_hint_html">按顺序合并 · 原文件无损复制</div>
+        <div class="text-modal-actions">
+          <button id="mergeCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="mergeConfirm" class="tool-btn primary" data-i18n="merge_btn">合并并载入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图片转 PDF 弹窗 -->
+    <div id="imageModal" class="text-modal" style="display: none">
+      <div class="text-modal-content page-modal-content" style="width: 480px">
+        <h3 id="imageModalTitle">图片转 PDF</h3>
+        <div class="merge-dropzone" id="imageDropzone">
+          <span data-i18n="image_drop_hint">点击选择 或 拖拽图片到此处</span>
+        </div>
+        <input type="file" id="imageFileInput" accept="image/png,image/jpeg,.png,.jpg,.jpeg" multiple style="display: none" />
+        <div class="image-list" id="imageList"></div>
+        <div class="page-total-hint" id="imageTotalHint"></div>
+        <div class="image-size-row">
+          <span class="page-modal-label" data-i18n="image_page_size" style="margin: 0">页面尺寸</span>
+          <div class="image-size-options" id="imageSizeOptions">
+            <button type="button" class="image-size-btn active" data-size="original" data-i18n="image_size_original">原图尺寸</button>
+            <button type="button" class="image-size-btn" data-size="a4" data-i18n="image_size_a4">适配 A4</button>
+          </div>
+        </div>
+        <div class="text-modal-hint" id="imageHintEl" data-i18n-html="image_hint_html">每张图生成一页 · 支持 PNG / JPG</div>
+        <div class="text-modal-actions">
+          <button id="imageCancel" class="tool-btn" data-i18n="cancel">取消</button>
+          <button id="imageConfirm" class="tool-btn primary">生成 PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none">
+      <div class="spinner"></div>
+      <p data-i18n="loading_pdf">正在加载PDF...</p>
+    </div>
+
+    <!-- Toast消息 -->
+    <div id="toast" class="toast" style="display: none"></div>
+
+    <script src="js/annotator.js"></script>
+    <script src="js/app.js"></script>
+    <script src="js/pagemanager.js"></script>
+    <script>
+      var _hmt = _hmt || [];
+      (function () {
+        var hm = document.createElement("script");
+        hm.src = "https://hm.baidu.com/hm.js?c3c2c4f28dbfb48052b7db1908c1f1b1";
+        var s = document.getElementsByTagName("script")[0];
+        s.parentNode.insertBefore(hm, s);
+      })();
+    </script>
+  </body>
+</html>

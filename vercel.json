@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    { "source": "/", "destination": "/pdf.html", "permanent": true },
+    { "source": "/home.html", "destination": "/index.html", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/robots.txt", "destination": "/robots-pdfmark.txt" },
+    { "source": "/sitemap.xml", "destination": "/sitemap-pdfmark.xml" }
+  ]
+}
